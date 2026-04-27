@@ -24,6 +24,14 @@ interface ServiceOptions {
   logger?: ServiceLogger;
 }
 
+type FindMovieByImdbResult =
+  | { success: true; tmdbId: number }
+  | {
+      success: false;
+      reason: 'not_found' | 'tv_results';
+      message: string;
+    };
+
 export function createMovieService(options?: ServiceOptions) {
   const serviceLogger = options?.logger ?? LOGGER;
 
@@ -112,6 +120,52 @@ export function createMovieService(options?: ServiceOptions) {
     }
   }
 
+  async function findMovieByImdbId(imdbId: string): Promise<FindMovieByImdbResult> {
+    const logger = localLogger('findMovieByImdbId');
+
+    try {
+      const response = await tmdbClient
+        .get(`find/${imdbId}`, {
+          searchParams: { external_source: 'imdb_id' },
+        })
+        .json<{
+          movie_results: { id: number }[];
+          tv_results: unknown[];
+          person_results: unknown[];
+          tv_episode_results: unknown[];
+          tv_season_results: unknown[];
+        }>();
+
+      if (response.movie_results.length > 0) {
+        return { success: true, tmdbId: response.movie_results[0].id };
+      }
+
+      if (
+        response.tv_results.length > 0 ||
+        response.tv_episode_results.length > 0 ||
+        response.tv_season_results.length > 0
+      ) {
+        return {
+          success: false,
+          reason: 'tv_results',
+          message: 'TMDB returned TV results instead of movie results',
+        };
+      }
+
+      return {
+        success: false,
+        reason: 'not_found',
+        message: 'No TMDB movie result found for this IMDb ID',
+      };
+    } catch (error) {
+      logger.error({ imdbId, err: error }, 'TMDB lookup by IMDB id failed');
+      if (error instanceof HTTPError) {
+        throw new Error(`TMDB lookup failed: ${error.response.statusCode}`, { cause: error });
+      }
+      throw error;
+    }
+  }
+
   async function getMovieDetails(tmdbId: number): Promise<MovieDetail> {
     const logger = localLogger('getMovieDetails');
 
@@ -161,6 +215,7 @@ export function createMovieService(options?: ServiceOptions) {
     searchMovies,
     discoverMovies,
     getMovieById,
+    findMovieByImdbId,
     getMovieDetails,
   };
 }

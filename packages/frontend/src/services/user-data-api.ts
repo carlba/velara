@@ -37,3 +37,16 @@ export async function updateReview(tmdbId: number, content: string): Promise<voi
 export async function removeReview(tmdbId: number): Promise<void> {
   await apiRequest(`/api/movies/${tmdbId}/review`, { method: 'DELETE' });
 }
+
+export interface ImportSummary {
+  importedCount: number;
+  skippedCount: number;
+  errors: string[];
+}
+
+export async function importRatings(content: string): Promise<ImportSummary> {
+  return apiRequest<ImportSummary>('/api/movies/import', {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}

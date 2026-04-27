@@ -23,10 +23,15 @@ export default function Header() {
         <nav className="flex items-center gap-2">
           {user ? (
             <>
-              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
-                {user.username}
-              </span>
+              <Button variant="ghost" size="sm" asChild>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground"
+                >
+                  <User className="h-4 w-4" />
+                  {user.username}
+                </Link>
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Sign out</span>
