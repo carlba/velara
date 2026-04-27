@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: velara
+      POSTGRES_PASSWORD: velara
+      POSTGRES_DB: velara
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://velara:velara@postgres:5432/velara
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:

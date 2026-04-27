@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  email        String       @unique
+  username     String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  reviews      Review[]
+  watchEntries WatchEntry[]
+  ratings      Rating[]
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  tmdbId    Int
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tmdbId, userId])
+}
+
+model WatchEntry {
+  id        Int      @id @default(autoincrement())
+  tmdbId    Int
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchedAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([tmdbId, userId])
+}
+
+model Rating {
+  id        Int      @id @default(autoincrement())
+  tmdbId    Int
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tmdbId, userId])
+}

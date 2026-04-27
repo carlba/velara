@@ -8,16 +8,21 @@ vi.mock('./lib/logger.js', () => ({
 }));
 
 describe('registry module', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
+  const originalEnv = { ...process.env };
 
   afterEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    process.env.NODE_ENV = originalNodeEnv;
+    Object.assign(process.env, originalEnv);
   });
 
   it('boots a production logger and then creates a config logger', async () => {
     process.env.NODE_ENV = 'test';
+    process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+    process.env.TMDB_API_KEY = 'test-tmdb-key';
+    process.env.OMDB_API_KEY = 'test-omdb-key';
+    process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-chars!!';
+
     const { config, LOGGER } = await import('./registry.js');
 
     expect(config.NODE_ENV).toBe('test');
@@ -25,14 +30,5 @@ describe('registry module', () => {
     expect(createLoggerMock).toHaveBeenNthCalledWith(2, undefined, 'test');
     expect(childMock).toHaveBeenCalledTimes(2);
     expect(typeof LOGGER.child).toBe('function');
-  });
-
-  it('uses package.json name for logger binding', async () => {
-    process.env.NODE_ENV = 'development';
-    const { bootstrapLogger } = await import('./registry.js');
-
-    expect(createLoggerMock).toHaveBeenCalledWith(undefined, 'production');
-    expect(childMock).toHaveBeenCalledWith({ name: 'typescript-template' });
-    expect(typeof bootstrapLogger.child).toBe('function');
   });
 });

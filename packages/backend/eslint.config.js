@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   {
-    ignores: ['dist/', 'node_modules/', 'eslint.config.js', 'vitest.config.ts'], // acts as global ignores, due to the absence of other properties
+    ignores: ['dist/', 'node_modules/', 'eslint.config.js', 'vitest.config.ts'],
   },
   js.configs.recommended,
   {
