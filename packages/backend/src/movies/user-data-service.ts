@@ -54,12 +54,12 @@ export function createUserDataService(options?: ServiceOptions) {
           select: { tmdbId: true },
         });
         const orderedIds = entries.map(entry => entry.tmdbId);
-        const additionalFilters = filters.filter(filter => filter !== 'watched');
-        if (additionalFilters.length === 0) return orderedIds;
-        const additionalIdSets = await Promise.all(
-          additionalFilters.map(filter => fetchIdsForFilter(userId, filter))
+        const intersectionFilters = filters.filter(filter => filter !== 'watched');
+        if (intersectionFilters.length === 0) return orderedIds;
+        const intersectionIdSets = await Promise.all(
+          intersectionFilters.map(filter => fetchIdsForFilter(userId, filter))
         );
-        const additionalIds = new Set(additionalIdSets.flat());
+        const additionalIds = new Set(intersectionIdSets.flat());
         return orderedIds.filter((id: number) => additionalIds.has(id));
       }
 
@@ -70,12 +70,12 @@ export function createUserDataService(options?: ServiceOptions) {
           select: { tmdbId: true },
         });
         const orderedIds = entries.map(entry => entry.tmdbId);
-        const additionalFilters = filters.filter(filter => filter !== 'rated');
-        if (additionalFilters.length === 0) return orderedIds;
-        const additionalIdSets = await Promise.all(
-          additionalFilters.map(filter => fetchIdsForFilter(userId, filter))
+        const intersectionFilters = filters.filter(filter => filter !== 'rated');
+        if (intersectionFilters.length === 0) return orderedIds;
+        const intersectionIdSets = await Promise.all(
+          intersectionFilters.map(filter => fetchIdsForFilter(userId, filter))
         );
-        const additionalIds = new Set(additionalIdSets.flat());
+        const additionalIds = new Set(intersectionIdSets.flat());
         return orderedIds.filter((id: number) => additionalIds.has(id));
       }
 
