@@ -38,6 +38,6 @@ export interface UserMovieData {
   review: { content: string } | null;
 }
 
-export type SortBy = 'popularity' | 'rating';
+export type SortBy = 'popularity' | 'rating' | 'watched_date' | 'my_rating';
 
 export type UserFilter = 'rated' | 'watched' | 'reviewed';
