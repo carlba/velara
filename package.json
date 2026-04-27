@@ -12,10 +12,11 @@
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "start:dev": "npm run --workspaces --if-present start:dev",
+    "start:dev": "concurrently \"npm --workspace packages/backend run start:dev\" \"npm --workspace packages/frontend run start:dev\"",
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "prettier": "^3.8.3"
   }
 }
