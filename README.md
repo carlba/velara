@@ -11,6 +11,7 @@ TMDB, IMDb, and Rotten Tomatoes ratings on each movie detail page.
 - Multi-user auth with JWT stored in httpOnly cookies
 - Mark movies as watched with a date
 - Rate movies 1–5 stars and write reviews
+- Import ratings or comments from Filmtipset CSV exports
 - Sort by popularity or rating
 
 ## Installation

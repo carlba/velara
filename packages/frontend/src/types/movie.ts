@@ -52,4 +52,4 @@ export interface UserMovieData {
 
 export type SortBy = 'popularity' | 'rating' | 'watched_date' | 'my_rating';
 
-export type UserFilter = 'rated' | 'watched' | 'reviewed';
+export type UserFilter = 'rated' | 'watched' | 'reviewed' | 'commented';

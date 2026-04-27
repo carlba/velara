@@ -34,15 +34,23 @@ export function createCommentService(options?: ServiceOptions) {
       });
     },
 
-    async createComment(tmdbId: number, userId: number, content: string) {
+    async createComment(
+      tmdbId: number,
+      userId: number,
+      content: string,
+      createdAt?: Date,
+      importedAt?: Date
+    ) {
       const logger = localLogger('createComment');
-      logger.debug({ tmdbId, userId }, 'Creating comment');
+      logger.debug({ tmdbId, userId, createdAt, importedAt }, 'Creating comment');
 
       return prisma.comment.create({
         data: {
           tmdbId,
           userId,
           content,
+          ...(createdAt ? { createdAt } : {}),
+          ...(importedAt ? { importedAt } : {}),
         },
         include: {
           user: {

@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { parse } from 'csv-parse/sync';
 import { LOGGER } from '../registry.js';
+import { createCommentService } from '../comments/comment-service.js';
 import { createMovieService } from './movie-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createWatchService } from '../watch/watch-service.js';
@@ -20,11 +21,21 @@ export interface ImportSummary {
   errors: string[];
 }
 
-interface ParsedRow {
+export type FilmtipsetImportType = 'ratings' | 'comments';
+
+interface ParsedRatingRow {
   imdbId: string;
   score: number;
   watchedAt: Date;
   title: string;
+  line: number;
+}
+
+interface ParsedCommentRow {
+  imdbId: string;
+  watchedAt: Date;
+  title: string;
+  comment: string;
   line: number;
 }
 
@@ -41,7 +52,7 @@ export function normalizeImdbId(value: string): string | null {
 export function parseFilmtipsetRows(
   content: string,
   logger: ImportLogger
-): { rows: ParsedRow[]; errors: string[] } {
+): { rows: ParsedRatingRow[]; errors: string[] } {
   const records = parse(content, {
     delimiter: ';',
     trim: true,
@@ -54,8 +65,8 @@ export function parseFilmtipsetRows(
   }
 
   const errors: string[] = [];
-  const rows: ParsedRow[] = [];
-  const header = records[0].map(column => column.toLowerCase());
+  const rows: ParsedRatingRow[] = [];
+  const header = records[0].map(column => String(column).toLowerCase());
   const hasHeader =
     header.includes('votedate') &&
     header.includes('movietitle') &&
@@ -115,48 +126,153 @@ export function parseFilmtipsetRows(
   return { rows, errors };
 }
 
-export async function importRatingsFromFilmtipset(
-  userId: number,
+export function parseFilmtipsetCommentRows(
   content: string,
-  options?: ServiceOptions
-): Promise<ImportSummary> {
-  const serviceLogger = options?.logger ?? LOGGER;
-  const logger = serviceLogger.child({ module: 'import-service' });
-  const { rows, errors } = parseFilmtipsetRows(content, logger);
+  logger: ImportLogger
+): { rows: ParsedCommentRow[]; errors: string[] } {
+  const records = parse(content, {
+    delimiter: ';',
+    trim: true,
+    skip_empty_lines: true,
+    relax_column_count: true,
+  });
 
-  const movieService = createMovieService({ logger });
-  const ratingService = createRatingService({ logger });
-  const watchService = createWatchService({ logger });
+  if (records.length === 0) {
+    return { rows: [], errors: ['File content is empty'] };
+  }
 
-  const dedupedRows = new Map<string, ParsedRow>();
+  const errors: string[] = [];
+  const rows: ParsedCommentRow[] = [];
+  const header = records[0].map(column => String(column).toLowerCase());
+  const hasHeader =
+    header.includes('date') &&
+    header.includes('movie') &&
+    header.includes('imdb') &&
+    header.includes('text');
+
+  const startIndex = hasHeader ? 1 : 0;
+
+  for (let index = startIndex; index < records.length; index += 1) {
+    const rawLine = records[index];
+    const lineNumber = index + 1;
+
+    if (rawLine.length !== 4) {
+      errors.push(`Line ${lineNumber}: expected 4 columns, got ${rawLine.length}`);
+      continue;
+    }
+
+    const [rawDate, title, imdbRaw, commentRaw] = rawLine;
+    const imdbId = normalizeImdbId(imdbRaw);
+    const watchedAt = new Date(rawDate);
+    const comment = String(commentRaw ?? '').trim();
+
+    if (!imdbId) {
+      logger.error({ line: lineNumber, rawImdb: imdbRaw }, 'Invalid IMDB id value');
+      errors.push(`Line ${lineNumber}: invalid IMDB id`);
+      continue;
+    }
+
+    if (Number.isNaN(watchedAt.getTime())) {
+      errors.push(`Line ${lineNumber}: invalid Date`);
+      continue;
+    }
+
+    if (!comment) {
+      errors.push(`Line ${lineNumber}: comment text is required`);
+      continue;
+    }
+
+    rows.push({ imdbId, watchedAt, title, comment, line: lineNumber });
+  }
+
+  return { rows, errors };
+}
+
+function dedupeRowsByImdbId<T extends { imdbId: string; watchedAt: Date }>(rows: T[]) {
+  const dedupedRows = new Map<string, T>();
   for (const row of rows) {
     const existing = dedupedRows.get(row.imdbId);
     if (!existing || row.watchedAt > existing.watchedAt) {
       dedupedRows.set(row.imdbId, row);
     }
   }
+  return dedupedRows;
+}
 
+export async function importFromFilmtipset(
+  userId: number,
+  content: string,
+  type: FilmtipsetImportType,
+  options?: ServiceOptions
+): Promise<ImportSummary> {
+  const serviceLogger = options?.logger ?? LOGGER;
+  const logger = serviceLogger.child({ module: 'import-service' });
+  const movieService = createMovieService({ logger });
+  const watchService = createWatchService({ logger });
+  const importTimestamp = new Date();
+  const errors: string[] = [];
   let importedCount = 0;
-  let skippedCount = errors.length;
+  let skippedCount = 0;
 
-  for (const row of dedupedRows.values()) {
-    try {
-      const lookupResult = await movieService.findMovieByImdbId(row.imdbId);
-      if (!lookupResult.success) {
-        errors.push(
-          `Line ${row.line}: ${lookupResult.message} (${lookupResult.reason}) for ${row.imdbId} (${row.title})`
-        );
+  if (type === 'ratings') {
+    const parseResult = parseFilmtipsetRows(content, logger);
+    errors.push(...parseResult.errors);
+    skippedCount += parseResult.errors.length;
+    const dedupedRows = dedupeRowsByImdbId(parseResult.rows);
+    const ratingService = createRatingService({ logger });
+
+    for (const row of dedupedRows.values()) {
+      try {
+        const lookupResult = await movieService.findMovieByImdbId(row.imdbId);
+        if (!lookupResult.success) {
+          errors.push(
+            `Line ${row.line}: ${lookupResult.message} (${lookupResult.reason}) for ${row.imdbId} (${row.title})`
+          );
+          skippedCount += 1;
+          continue;
+        }
+
+        await ratingService.upsertRating(lookupResult.tmdbId, userId, row.score, importTimestamp);
+        await watchService.createWatchEntryIfMissing(lookupResult.tmdbId, userId, row.watchedAt);
+        importedCount += 1;
+      } catch (error) {
+        logger.error({ err: error, row }, 'Failed to import rating row');
+        errors.push(`Line ${row.line}: import failed`);
         skippedCount += 1;
-        continue;
       }
+    }
+  } else {
+    const parseResult = parseFilmtipsetCommentRows(content, logger);
+    errors.push(...parseResult.errors);
+    skippedCount += parseResult.errors.length;
+    const dedupedRows = dedupeRowsByImdbId(parseResult.rows);
+    const commentService = createCommentService({ logger });
 
-      await ratingService.upsertRating(lookupResult.tmdbId, userId, row.score);
-      await watchService.getOrCreateWatchEntry(lookupResult.tmdbId, userId, row.watchedAt);
-      importedCount += 1;
-    } catch (error) {
-      logger.error({ err: error, row }, 'Failed to import rating row');
-      errors.push(`Line ${row.line}: import failed`);
-      skippedCount += 1;
+    for (const row of dedupedRows.values()) {
+      try {
+        const lookupResult = await movieService.findMovieByImdbId(row.imdbId);
+        if (!lookupResult.success) {
+          errors.push(
+            `Line ${row.line}: ${lookupResult.message} (${lookupResult.reason}) for ${row.imdbId} (${row.title})`
+          );
+          skippedCount += 1;
+          continue;
+        }
+
+        await commentService.createComment(
+          lookupResult.tmdbId,
+          userId,
+          row.comment,
+          row.watchedAt,
+          importTimestamp
+        );
+        await watchService.createWatchEntryIfMissing(lookupResult.tmdbId, userId, row.watchedAt);
+        importedCount += 1;
+      } catch (error) {
+        logger.error({ err: error, row }, 'Failed to import comment row');
+        errors.push(`Line ${row.line}: import failed`);
+        skippedCount += 1;
+      }
     }
   }
 
@@ -165,4 +281,12 @@ export async function importRatingsFromFilmtipset(
     skippedCount,
     errors,
   };
+}
+
+export async function importRatingsFromFilmtipset(
+  userId: number,
+  content: string,
+  options?: ServiceOptions
+): Promise<ImportSummary> {
+  return importFromFilmtipset(userId, content, 'ratings', options);
 }

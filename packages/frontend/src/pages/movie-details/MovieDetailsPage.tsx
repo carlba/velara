@@ -11,6 +11,7 @@ import { useMovieDetails } from '@/hooks/useMovieDetails';
 import { useMovieComments } from '@/hooks/useMovieComments';
 import { useUserMovieData } from '@/hooks/useUserMovieData';
 import { useAuth } from '@/hooks/useAuth';
+import { formatDateTime } from '@/lib/utils';
 
 export default function MovieDetailsPage() {
   const { tmdbId } = useParams<{ tmdbId: string }>();
@@ -215,12 +216,7 @@ export default function MovieDetailsPage() {
             </Button>
             {isWatched && userData?.watchEntry?.watchedAt && (
               <span className="text-sm text-muted-foreground">
-                on{' '}
-                {new Date(userData.watchEntry.watchedAt).toLocaleDateString(undefined, {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                on {formatDateTime(userData.watchEntry.watchedAt)}
               </span>
             )}
           </div>
@@ -342,7 +338,7 @@ export default function MovieDetailsPage() {
                   <div>
                     <p className="text-sm font-semibold">{comment.user.username}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(comment.createdAt).toLocaleString()}
+                      {formatDateTime(comment.createdAt)}
                     </p>
                   </div>
                   {user?.id === comment.user.id && (

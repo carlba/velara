@@ -15,6 +15,7 @@ const USER_FILTER_LABELS: Record<UserFilter, string> = {
   rated: 'Rated by me',
   watched: 'Watched by me',
   reviewed: 'Reviewed by me',
+  commented: 'Commented by me',
 };
 
 interface MovieSearchProps {

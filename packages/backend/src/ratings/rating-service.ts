@@ -16,14 +16,19 @@ export function createRatingService(options?: ServiceOptions) {
     serviceLogger.child({ module: 'rating-service', context });
 
   return {
-    async upsertRating(tmdbId: number, userId: number, score: number) {
+    async upsertRating(tmdbId: number, userId: number, score: number, importedAt?: Date) {
       const logger = localLogger('upsertRating');
-      logger.debug({ tmdbId, userId, score }, 'Upserting rating');
+      logger.debug({ tmdbId, userId, score, importedAt }, 'Upserting rating');
 
       return prisma.rating.upsert({
         where: { tmdbId_userId: { tmdbId, userId } },
         update: { score },
-        create: { tmdbId, userId, score },
+        create: {
+          tmdbId,
+          userId,
+          score,
+          ...(importedAt ? { importedAt } : {}),
+        },
       });
     },
 

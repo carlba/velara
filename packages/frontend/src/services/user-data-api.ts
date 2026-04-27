@@ -44,9 +44,16 @@ export interface ImportSummary {
   errors: string[];
 }
 
-export async function importRatings(content: string): Promise<ImportSummary> {
+export async function importFilmtipset(
+  content: string,
+  type: 'ratings' | 'comments'
+): Promise<ImportSummary> {
   return apiRequest<ImportSummary>('/api/movies/import', {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, type }),
   });
+}
+
+export async function importRatings(content: string): Promise<ImportSummary> {
+  return importFilmtipset(content, 'ratings');
 }
