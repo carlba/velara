@@ -19,7 +19,7 @@ services:
     depends_on:
       - postgres
     ports:
-      - '3000:3000'
+      - '3070:3070'
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://velara:velara@postgres:5432/velara

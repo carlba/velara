@@ -38,7 +38,7 @@ cd packages/backend && npx prisma migrate dev
 npm run start:dev --workspaces --if-present
 ```
 
-The backend runs on `http://localhost:3000` and the frontend on
+The backend runs on `http://localhost:3070` and the frontend on
 `http://localhost:5173`.
 
 ## Usage

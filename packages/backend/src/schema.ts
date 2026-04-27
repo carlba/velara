@@ -11,7 +11,7 @@ export const envSchema = z
     TMDB_API_KEY: z.string().min(1),
     OMDB_API_KEY: z.string().min(1),
     JWT_SECRET: z.string().min(32),
-    PORT: z.coerce.number().int().positive().default(3000),
+    PORT: z.coerce.number().int().positive().default(3070),
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
   })
   .transform(raw => ({

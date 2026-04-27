@@ -122,8 +122,39 @@ async function fetchUser(userId: string): Promise<User> {
 
 - Prefer TypeScript on Node.js for backend services.
 - Use Fastify as the default HTTP framework.
+- Validate routes using zod, like so
+
+  ```typescript
+  import fastify from 'fastify';
+  import { ZodTypeProvider } from 'fastify-type-provider-zod';
+  import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
+  const app = fastify().withTypeProvider<ZodTypeProvider>();
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+
+  const exampleSchema = {
+    body: z.object({
+      name: z.string(),
+      age: z.number(),
+    }),
+    response: {
+      200: z.object({
+        id: z.string(),
+        name: z.string(),
+      }),
+    },
+  };
+
+  app.post('/user', { schema: exampleSchema }, async (req, reply) => {
+    const { id, name } = await service.create(req.body);
+    return { id, name };
+    // Types are inferred from the Zod schema.
+  });
+  ```
+
+- Create an use HttpError() that are an extension of Error with statusCode for exceptionhandling,
+  ensure that these still capture the stacktrace.
 - Keep architecture simple and modular; avoid heavy abstractions unless clearly required.
-- Prefer schema-based request and response validation.
 - Write small, focused route handlers and move business logic into separate services.
 - Do not introduce NestJS, Express, or other frameworks unless explicitly requested or already in
   use.
