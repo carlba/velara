@@ -1,9 +1,9 @@
 name: Build and Publish Docker Container
 
+# Disabled auto-publish until Docker is actually used.
+# Run manually when Docker publishing is needed.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 # The default permissions of the auto generated `GITHUB_TOKEN` only allows read access this will ensure
 # that write access is also available. More information
