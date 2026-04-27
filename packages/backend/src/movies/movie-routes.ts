@@ -7,6 +7,7 @@ import { createUserDataService } from './user-data-service.js';
 import { createWatchService } from '../watch/watch-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createReviewService } from '../reviews/review-service.js';
+import { importRatingsFromFilmtipset } from './import-service.js';
 import { USER_FILTER_VALUES } from './movie-types.js';
 import type { SortBy, UserFilterValue } from './movie-types.js';
 
@@ -36,6 +37,10 @@ const ratingBodySchema = z.object({
 
 const reviewBodySchema = z.object({
   content: z.string().min(1).max(5000),
+});
+
+const importBodySchema = z.object({
+  content: z.string().min(1),
 });
 
 function handleNotFound(error: unknown): never {
@@ -120,6 +125,15 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
         request.user.userId
       );
       return reply.send(data);
+    }
+  );
+
+  fastify.post(
+    '/import',
+    { preHandler: authenticate, schema: { body: importBodySchema } },
+    async (request, reply) => {
+      const summary = await importRatingsFromFilmtipset(request.user.userId, request.body.content);
+      return reply.send(summary);
     }
   );
 

@@ -57,4 +57,26 @@ describe('movie service', () => {
     expect(loggedMeta).toEqual(expect.objectContaining({ imdbId: 'tt1234567' }));
     expect(loggedMeta.err).toBeInstanceOf(Error);
   });
+
+  it('returns a failed lookup result when TMDB returns TV results', async () => {
+    tmdbGetMock.mockReturnValue({
+      json: vi.fn().mockResolvedValue({
+        movie_results: [],
+        tv_results: [{ id: 42 }],
+        person_results: [],
+        tv_episode_results: [],
+        tv_season_results: [],
+      }),
+    });
+
+    const { createMovieService } = await import('./movie-service.js');
+    const movieService = createMovieService({ logger: loggerMock as unknown as Logger });
+    const result = await movieService.findMovieByImdbId('tt1234567');
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'tv_results',
+      message: 'TMDB returned TV results instead of movie results',
+    });
+  });
 });
