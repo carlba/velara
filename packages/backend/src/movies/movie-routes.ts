@@ -1,4 +1,4 @@
-import type { FastifyPluginCallback } from 'fastify';
+import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { HTTPError } from 'got';
 import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
@@ -36,78 +36,103 @@ function handleNotFound(error: unknown): never {
   throw error;
 }
 
-export const movieRoutes: FastifyPluginCallback = (fastify, _options, done) => {
-  fastify.get('/', async (request, reply) => {
-    const query = listQuerySchema.parse(request.query);
+export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
+  fastify.get('/', { schema: { querystring: listQuerySchema } }, async (request, reply) => {
+    const { tmdb_id, search, page, sort_by } = request.query;
 
-    if (query.tmdb_id !== undefined) {
-      const movie = await getMovieById(query.tmdb_id).catch(handleNotFound);
+    if (tmdb_id !== undefined) {
+      const movie = await getMovieById(tmdb_id).catch(handleNotFound);
       return reply.send({ results: [movie], page: 1, total_pages: 1, total_results: 1 });
     }
 
-    if (query.search) {
-      const data = await searchMovies(query.search, query.page);
+    if (search) {
+      const data = await searchMovies(search, page);
       return reply.send(data);
     }
 
-    const data = await discoverMovies(query.sort_by, query.page);
+    const data = await discoverMovies(sort_by, page);
     return reply.send(data);
   });
 
-  fastify.get('/:tmdbId', async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    const movie = await getMovieDetails(tmdbId).catch(handleNotFound);
+  fastify.get('/:tmdbId', { schema: { params: paramsSchema } }, async (request, reply) => {
+    const movie = await getMovieDetails(request.params.tmdbId).catch(handleNotFound);
     return reply.send(movie);
   });
 
-  fastify.get('/:tmdbId/user-data', { preHandler: authenticate }, async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    const data = await getUserMovieData(tmdbId, request.user.userId);
-    return reply.send(data);
-  });
+  fastify.get(
+    '/:tmdbId/user-data',
+    { preHandler: authenticate, schema: { params: paramsSchema } },
+    async (request, reply) => {
+      const data = await getUserMovieData(request.params.tmdbId, request.user.userId);
+      return reply.send(data);
+    }
+  );
 
-  fastify.put('/:tmdbId/watch', { preHandler: authenticate }, async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    const body = watchBodySchema.parse(request.body);
-    const entry = await getOrCreateWatchEntry(
-      tmdbId,
-      request.user.userId,
-      new Date(body.watchedAt)
-    );
-    return reply.send(entry);
-  });
+  fastify.put(
+    '/:tmdbId/watch',
+    { preHandler: authenticate, schema: { params: paramsSchema, body: watchBodySchema } },
+    async (request, reply) => {
+      const entry = await getOrCreateWatchEntry(
+        request.params.tmdbId,
+        request.user.userId,
+        new Date(request.body.watchedAt)
+      );
+      return reply.send(entry);
+    }
+  );
 
-  fastify.delete('/:tmdbId/watch', { preHandler: authenticate }, async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    await deleteWatchEntry(tmdbId, request.user.userId);
-    return reply.code(204).send();
-  });
+  fastify.delete(
+    '/:tmdbId/watch',
+    { preHandler: authenticate, schema: { params: paramsSchema } },
+    async (request, reply) => {
+      await deleteWatchEntry(request.params.tmdbId, request.user.userId);
+      return reply.code(204).send();
+    }
+  );
 
-  fastify.put('/:tmdbId/rating', { preHandler: authenticate }, async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    const body = ratingBodySchema.parse(request.body);
-    const rating = await upsertRating(tmdbId, request.user.userId, body.score);
-    return reply.send(rating);
-  });
+  fastify.put(
+    '/:tmdbId/rating',
+    { preHandler: authenticate, schema: { params: paramsSchema, body: ratingBodySchema } },
+    async (request, reply) => {
+      const rating = await upsertRating(
+        request.params.tmdbId,
+        request.user.userId,
+        request.body.score
+      );
+      return reply.send(rating);
+    }
+  );
 
-  fastify.delete('/:tmdbId/rating', { preHandler: authenticate }, async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    await deleteRating(tmdbId, request.user.userId);
-    return reply.code(204).send();
-  });
+  fastify.delete(
+    '/:tmdbId/rating',
+    { preHandler: authenticate, schema: { params: paramsSchema } },
+    async (request, reply) => {
+      await deleteRating(request.params.tmdbId, request.user.userId);
+      return reply.code(204).send();
+    }
+  );
 
-  fastify.put('/:tmdbId/review', { preHandler: authenticate }, async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    const body = reviewBodySchema.parse(request.body);
-    const review = await upsertReview(tmdbId, request.user.userId, body.content);
-    return reply.send(review);
-  });
+  fastify.put(
+    '/:tmdbId/review',
+    { preHandler: authenticate, schema: { params: paramsSchema, body: reviewBodySchema } },
+    async (request, reply) => {
+      const review = await upsertReview(
+        request.params.tmdbId,
+        request.user.userId,
+        request.body.content
+      );
+      return reply.send(review);
+    }
+  );
 
-  fastify.delete('/:tmdbId/review', { preHandler: authenticate }, async (request, reply) => {
-    const { tmdbId } = paramsSchema.parse(request.params);
-    await deleteReview(tmdbId, request.user.userId);
-    return reply.code(204).send();
-  });
+  fastify.delete(
+    '/:tmdbId/review',
+    { preHandler: authenticate, schema: { params: paramsSchema } },
+    async (request, reply) => {
+      await deleteReview(request.params.tmdbId, request.user.userId);
+      return reply.code(204).send();
+    }
+  );
 
   done();
 };

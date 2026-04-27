@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import type { FastifyError } from 'fastify';
+import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
@@ -10,7 +12,9 @@ import { movieRoutes } from './movies/movie-routes.js';
 
 const logger = LOGGER.child({ module: 'index' });
 
-const server = Fastify({ logger: false });
+const server = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
+server.setValidatorCompiler(validatorCompiler);
+server.setSerializerCompiler(serializerCompiler);
 
 server.setErrorHandler((error: unknown, _request, reply) => {
   if (error instanceof Error && error.constructor.name === 'ZodError') {

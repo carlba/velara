@@ -1,4 +1,4 @@
-import type { FastifyPluginCallback } from 'fastify';
+import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { config } from '../registry.js';
 import { registerUser, loginUser, getUserById } from './auth-service.js';
@@ -17,10 +17,9 @@ const loginBodySchema = z.object({
   password: z.string().min(1),
 });
 
-export const authRoutes: FastifyPluginCallback = (fastify, _options, done) => {
-  fastify.post('/register', async (request, reply) => {
-    const body = registerBodySchema.parse(request.body);
-    const user = await registerUser(body);
+export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
+  fastify.post('/register', { schema: { body: registerBodySchema } }, async (request, reply) => {
+    const user = await registerUser(request.body);
 
     const token = fastify.jwt.sign(
       { userId: user.id, email: user.email, username: user.username },
@@ -38,9 +37,8 @@ export const authRoutes: FastifyPluginCallback = (fastify, _options, done) => {
     return reply.code(201).send({ user });
   });
 
-  fastify.post('/login', async (request, reply) => {
-    const body = loginBodySchema.parse(request.body);
-    const user = await loginUser(body);
+  fastify.post('/login', { schema: { body: loginBodySchema } }, async (request, reply) => {
+    const user = await loginUser(request.body);
 
     if (!user) {
       return reply.code(401).send({ error: 'Invalid email or password' });
