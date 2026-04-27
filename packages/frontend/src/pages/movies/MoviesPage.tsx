@@ -4,14 +4,17 @@ import { Button } from '@/components/ui/button';
 import MovieSearch from '@/components/movies/MovieSearch';
 import MovieGrid from '@/components/movies/MovieGrid';
 import { useMovies } from '@/hooks/useMovies';
-import type { SortBy } from '@/types/movie';
+import { useAuth } from '@/hooks/useAuth';
+import type { SortBy, UserFilter } from '@/types/movie';
 
 const DEBOUNCE_MS = 400;
 
 export default function MoviesPage() {
+  const { user } = useAuth();
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('popularity');
+  const [userFilters, setUserFilters] = useState<UserFilter[]>([]);
   const [page, setPage] = useState(1);
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,6 +28,7 @@ export default function MoviesPage() {
     tmdbId: tmdbIdMatch,
     page,
     sortBy,
+    userFilters,
   });
 
   const handleSearch = useCallback(
@@ -45,6 +49,13 @@ export default function MoviesPage() {
     setPage(1);
   };
 
+  const handleFilterChange = (filter: UserFilter) => {
+    setUserFilters(prev =>
+      prev.includes(filter) ? prev.filter(f => f !== filter) : [...prev, filter]
+    );
+    setPage(1);
+  };
+
   const totalPages = data?.total_pages ?? 1;
 
   return (
@@ -59,6 +70,8 @@ export default function MoviesPage() {
         onSortChange={handleSortChange}
         sortBy={sortBy}
         defaultValue={searchInput}
+        userFilters={userFilters}
+        onFilterChange={user ? handleFilterChange : undefined}
       />
 
       <MovieGrid movies={data?.results ?? []} isLoading={isLoading || isFetching} />

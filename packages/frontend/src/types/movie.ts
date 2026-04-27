@@ -39,3 +39,5 @@ export interface UserMovieData {
 }
 
 export type SortBy = 'popularity' | 'rating';
+
+export type UserFilter = 'rated' | 'watched' | 'reviewed';
