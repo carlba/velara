@@ -32,6 +32,18 @@ export interface MovieListResponse {
   total_results: number;
 }
 
+export interface MovieComment {
+  id: number;
+  tmdbId: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: number;
+    username: string;
+  };
+}
+
 export interface UserMovieData {
   watchEntry: { watchedAt: string } | null;
   rating: { score: number } | null;
