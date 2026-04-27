@@ -2,11 +2,11 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { HTTPError } from 'got';
 import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
-import { searchMovies, discoverMovies, getMovieDetails, getMovieById } from './movie-service.js';
-import { getOrCreateWatchEntry, deleteWatchEntry } from '../watch/watch-service.js';
-import { upsertRating, deleteRating } from '../ratings/rating-service.js';
-import { upsertReview, deleteReview } from '../reviews/review-service.js';
-import { getUserMovieData } from './user-data-service.js';
+import { createMovieService } from './movie-service.js';
+import { createUserDataService } from './user-data-service.js';
+import { createWatchService } from '../watch/watch-service.js';
+import { createRatingService } from '../ratings/rating-service.js';
+import { createReviewService } from '../reviews/review-service.js';
 
 const listQuerySchema = z.object({
   search: z.string().optional(),
@@ -41,21 +41,25 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     const { tmdb_id, search, page, sort_by } = request.query;
 
     if (tmdb_id !== undefined) {
-      const movie = await getMovieById(tmdb_id).catch(handleNotFound);
+      const movieService = createMovieService({ logger: request.log });
+      const movie = await movieService.getMovieById(tmdb_id).catch(handleNotFound);
       return reply.send({ results: [movie], page: 1, total_pages: 1, total_results: 1 });
     }
 
     if (search) {
-      const data = await searchMovies(search, page);
+      const movieService = createMovieService({ logger: request.log });
+      const data = await movieService.searchMovies(search, page);
       return reply.send(data);
     }
 
-    const data = await discoverMovies(sort_by, page);
+    const movieService = createMovieService({ logger: request.log });
+    const data = await movieService.discoverMovies(sort_by, page);
     return reply.send(data);
   });
 
   fastify.get('/:tmdbId', { schema: { params: paramsSchema } }, async (request, reply) => {
-    const movie = await getMovieDetails(request.params.tmdbId).catch(handleNotFound);
+    const movieService = createMovieService({ logger: request.log });
+    const movie = await movieService.getMovieDetails(request.params.tmdbId).catch(handleNotFound);
     return reply.send(movie);
   });
 
@@ -63,7 +67,11 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/:tmdbId/user-data',
     { preHandler: authenticate, schema: { params: paramsSchema } },
     async (request, reply) => {
-      const data = await getUserMovieData(request.params.tmdbId, request.user.userId);
+      const userDataService = createUserDataService({ logger: request.log });
+      const data = await userDataService.getUserMovieData(
+        request.params.tmdbId,
+        request.user.userId
+      );
       return reply.send(data);
     }
   );
@@ -72,7 +80,8 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/:tmdbId/watch',
     { preHandler: authenticate, schema: { params: paramsSchema, body: watchBodySchema } },
     async (request, reply) => {
-      const entry = await getOrCreateWatchEntry(
+      const watchService = createWatchService({ logger: request.log });
+      const entry = await watchService.getOrCreateWatchEntry(
         request.params.tmdbId,
         request.user.userId,
         new Date(request.body.watchedAt)
@@ -85,7 +94,8 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/:tmdbId/watch',
     { preHandler: authenticate, schema: { params: paramsSchema } },
     async (request, reply) => {
-      await deleteWatchEntry(request.params.tmdbId, request.user.userId);
+      const watchService = createWatchService({ logger: request.log });
+      await watchService.deleteWatchEntry(request.params.tmdbId, request.user.userId);
       return reply.code(204).send();
     }
   );
@@ -94,7 +104,8 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/:tmdbId/rating',
     { preHandler: authenticate, schema: { params: paramsSchema, body: ratingBodySchema } },
     async (request, reply) => {
-      const rating = await upsertRating(
+      const ratingService = createRatingService({ logger: request.log });
+      const rating = await ratingService.upsertRating(
         request.params.tmdbId,
         request.user.userId,
         request.body.score
@@ -107,7 +118,8 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/:tmdbId/rating',
     { preHandler: authenticate, schema: { params: paramsSchema } },
     async (request, reply) => {
-      await deleteRating(request.params.tmdbId, request.user.userId);
+      const ratingService = createRatingService({ logger: request.log });
+      await ratingService.deleteRating(request.params.tmdbId, request.user.userId);
       return reply.code(204).send();
     }
   );
@@ -116,7 +128,8 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/:tmdbId/review',
     { preHandler: authenticate, schema: { params: paramsSchema, body: reviewBodySchema } },
     async (request, reply) => {
-      const review = await upsertReview(
+      const reviewService = createReviewService({ logger: request.log });
+      const review = await reviewService.upsertReview(
         request.params.tmdbId,
         request.user.userId,
         request.body.content
@@ -129,7 +142,8 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/:tmdbId/review',
     { preHandler: authenticate, schema: { params: paramsSchema } },
     async (request, reply) => {
-      await deleteReview(request.params.tmdbId, request.user.userId);
+      const reviewService = createReviewService({ logger: request.log });
+      await reviewService.deleteReview(request.params.tmdbId, request.user.userId);
       return reply.code(204).send();
     }
   );

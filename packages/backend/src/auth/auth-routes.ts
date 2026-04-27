@@ -1,8 +1,8 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { config } from '../registry.js';
-import { registerUser, loginUser, getUserById } from './auth-service.js';
 import { authenticate } from './auth-middleware.js';
+import { createAuthService } from './auth-service.js';
 
 const COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
@@ -19,7 +19,8 @@ const loginBodySchema = z.object({
 
 export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
   fastify.post('/register', { schema: { body: registerBodySchema } }, async (request, reply) => {
-    const user = await registerUser(request.body);
+    const authService = createAuthService({ logger: request.log });
+    const user = await authService.registerUser(request.body);
 
     const token = fastify.jwt.sign(
       { userId: user.id, email: user.email, username: user.username },
@@ -38,7 +39,8 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
   });
 
   fastify.post('/login', { schema: { body: loginBodySchema } }, async (request, reply) => {
-    const user = await loginUser(request.body);
+    const authService = createAuthService({ logger: request.log });
+    const user = await authService.loginUser(request.body);
 
     if (!user) {
       return reply.code(401).send({ error: 'Invalid email or password' });
@@ -66,7 +68,8 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
   });
 
   fastify.get('/me', { preHandler: authenticate }, async (request, reply) => {
-    const user = await getUserById(request.user.userId);
+    const authService = createAuthService({ logger: request.log });
+    const user = await authService.getUserById(request.user.userId);
     if (!user) {
       return reply.code(404).send({ error: 'User not found' });
     }

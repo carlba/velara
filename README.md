@@ -23,6 +23,7 @@ Requires Node.js 24+, Docker (for PostgreSQL), and API keys for
 cp .env.example .env
 # Fill in DATABASE_URL, TMDB_API_KEY, OMDB_API_KEY, JWT_SECRET
 npm install
+cd packages/backend && npm run db:generate
 ```
 
 Start the database:
@@ -44,6 +45,9 @@ The backend runs on `http://localhost:3070` and the frontend on
 ## Usage
 
 ```bash
+# Generate backend Prisma client (required after install or schema changes)
+cd packages/backend && npm run db:generate
+
 # Build all packages
 npm run build
 
