@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import type { FastifyError } from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { ZodError } from 'zod';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
@@ -18,15 +19,17 @@ server.setSerializerCompiler(serializerCompiler);
 
 server.setErrorHandler((error: unknown, request, reply) => {
   if (error instanceof Error && error.constructor.name === 'ZodError') {
+    request.log.warn({ err: error, issues: (error as ZodError).issues }, 'Validation error');
     return reply.code(400).send({ error: 'Validation error' });
   }
 
   if (error instanceof Error) {
     const fastifyError = error as FastifyError;
     if (typeof fastifyError.statusCode === 'number' && fastifyError.statusCode < 500) {
+      request.log.warn({ err: error, statusCode: fastifyError.statusCode }, 'Client error');
       return reply.code(fastifyError.statusCode).send({ error: error.message });
     }
-    request.log.error({ message: error.message, stack: error.stack }, 'Unhandled server error');
+    request.log.error({ err: error }, 'Unhandled server error');
   }
 
   return reply.code(500).send({ error: 'Internal server error' });
