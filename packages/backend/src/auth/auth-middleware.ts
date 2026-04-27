@@ -1,10 +1,11 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const localLog = request.log.child({ module: 'auth', context: authenticate.name });
   try {
     await request.jwtVerify();
   } catch (error) {
-    request.log.warn(
+    localLog.warn(
       { err: error, method: request.method, url: request.raw.url },
       'JWT verification failed'
     );
