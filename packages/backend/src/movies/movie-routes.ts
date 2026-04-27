@@ -7,12 +7,20 @@ import { createUserDataService } from './user-data-service.js';
 import { createWatchService } from '../watch/watch-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createReviewService } from '../reviews/review-service.js';
+import { USER_FILTER_VALUES } from './movie-types.js';
+
+const PAGE_SIZE = 20;
 
 const listQuerySchema = z.object({
   search: z.string().optional(),
   tmdb_id: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().int().positive().default(1),
   sort_by: z.enum(['popularity', 'rating']).default('popularity'),
+  user_filter: z
+    .string()
+    .transform(raw => raw.split(',').filter(Boolean))
+    .pipe(z.array(z.enum(USER_FILTER_VALUES)))
+    .optional(),
 });
 
 const paramsSchema = z.object({ tmdbId: z.coerce.number().int().positive() });
@@ -38,7 +46,7 @@ function handleNotFound(error: unknown): never {
 
 export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
   fastify.get('/', { schema: { querystring: listQuerySchema } }, async (request, reply) => {
-    const { tmdb_id, search, page, sort_by } = request.query;
+    const { tmdb_id, search, page, sort_by, user_filter } = request.query;
 
     if (tmdb_id !== undefined) {
       const movieService = createMovieService({ logger: request.log });
@@ -50,6 +58,28 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
       const movieService = createMovieService({ logger: request.log });
       const data = await movieService.searchMovies(search, page);
       return reply.send(data);
+    }
+
+    if (user_filter && user_filter.length > 0) {
+      try {
+        await request.jwtVerify();
+      } catch {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const userDataService = createUserDataService({ logger: request.log });
+      const tmdbIds = await userDataService.getFilteredTmdbIds(request.user.userId, user_filter);
+
+      if (tmdbIds.length === 0) {
+        return reply.send({ results: [], page: 1, total_pages: 1, total_results: 0 });
+      }
+
+      const totalResults = tmdbIds.length;
+      const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+      const pageIds = tmdbIds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+      const movieService = createMovieService({ logger: request.log });
+      const results = await Promise.all(pageIds.map(id => movieService.getMovieById(id)));
+      return reply.send({ results, page, total_pages: totalPages, total_results: totalResults });
     }
 
     const movieService = createMovieService({ logger: request.log });

@@ -1,12 +1,13 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchMovies } from '@/services/movies-api';
-import type { SortBy } from '@/types/movie';
+import type { SortBy, UserFilter } from '@/types/movie';
 
 interface UseMoviesParams {
   search?: string;
   tmdbId?: number;
   page: number;
   sortBy: SortBy;
+  userFilters?: UserFilter[];
 }
 
 export function useMovies(params: UseMoviesParams) {
