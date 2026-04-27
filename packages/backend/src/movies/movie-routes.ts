@@ -2,6 +2,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { HTTPError } from 'got';
 import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
+import { HttpError } from '../lib/http-error.js';
 import { createMovieService } from './movie-service.js';
 import { createUserDataService } from './user-data-service.js';
 import { createWatchService } from '../watch/watch-service.js';
@@ -56,7 +57,7 @@ const importBodySchema = z.object({
 
 function handleNotFound(error: unknown): never {
   if (error instanceof HTTPError && error.response.statusCode === 404) {
-    throw Object.assign(new Error('Movie not found', { cause: error }), { statusCode: 404 });
+    throw new HttpError('Movie not found', { statusCode: 404, cause: error });
   }
   throw error;
 }

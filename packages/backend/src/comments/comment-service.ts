@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
+import { HttpError } from '../lib/http-error.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -72,7 +73,7 @@ export function createCommentService(options?: ServiceOptions) {
       });
 
       if (result.count === 0) {
-        throw Object.assign(new Error('Comment not found'), { statusCode: 404 });
+        throw new HttpError('Comment not found', { statusCode: 404 });
       }
     },
   };
