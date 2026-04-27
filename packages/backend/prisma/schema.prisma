@@ -17,6 +17,7 @@ model User {
   passwordHash String
   createdAt    DateTime     @default(now())
   reviews      Review[]
+  comments     Comment[]
   watchEntries WatchEntry[]
   ratings      Rating[]
 }
@@ -54,4 +55,16 @@ model Rating {
   updatedAt DateTime @updatedAt
 
   @@unique([tmdbId, userId])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  tmdbId    Int
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tmdbId])
 }

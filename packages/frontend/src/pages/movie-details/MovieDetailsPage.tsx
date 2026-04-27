@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import StarRating from '@/components/movies/StarRating';
 import { useMovieDetails } from '@/hooks/useMovieDetails';
+import { useMovieComments } from '@/hooks/useMovieComments';
 import { useUserMovieData } from '@/hooks/useUserMovieData';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -16,11 +17,14 @@ export default function MovieDetailsPage() {
   const id = Number(tmdbId);
   const { user } = useAuth();
   const { movieQuery, userDataQuery } = useMovieDetails(id);
+  const { commentsQuery, addComment, removeComment } = useMovieComments(id);
   const mutations = useUserMovieData(id);
   const [reviewText, setReviewText] = useState<string | undefined>(undefined);
+  const [commentText, setCommentText] = useState('');
 
   const movie = movieQuery.data;
   const userData = userDataQuery.data;
+  const comments = commentsQuery.data ?? [];
 
   const currentReview = reviewText ?? userData?.review?.content ?? '';
 
@@ -68,6 +72,14 @@ export default function MovieDetailsPage() {
       mutations.deleteReviewMutation.mutate();
     }
     setReviewText(undefined);
+  };
+
+  const handlePostComment = () => {
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
+    addComment.mutate(trimmed);
+    setCommentText('');
   };
 
   const year = movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : null;
@@ -278,6 +290,78 @@ export default function MovieDetailsPage() {
           </div>
         </div>
       )}
+
+      <Separator />
+
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Comments</h2>
+            <p className="text-sm text-muted-foreground">
+              Comments are visible to everyone. Only signed in users can post.
+            </p>
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+          </span>
+        </div>
+
+        {user ? (
+          <div className="space-y-2 rounded-2xl border p-4">
+            <Textarea
+              placeholder="Add a comment…"
+              rows={3}
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              className="resize-none"
+            />
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={handlePostComment}
+                disabled={addComment.isPending || !commentText.trim()}>
+                {addComment.isPending ? 'Posting…' : 'Post comment'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border bg-muted/50 p-6 text-sm text-muted-foreground">
+            Sign in to comment on this movie.
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {commentsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading comments…</p>
+          ) : comments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No comments yet.</p>
+          ) : (
+            comments.map(comment => (
+              <div key={comment.id} className="rounded-2xl border bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{comment.user.username}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(comment.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  {user?.id === comment.user.id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeComment.mutate(comment.id)}
+                      disabled={removeComment.isPending}
+                      aria-label="Delete comment">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <p className="mt-3 whitespace-pre-line text-sm leading-6">{comment.content}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

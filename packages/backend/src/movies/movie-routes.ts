@@ -7,6 +7,7 @@ import { createUserDataService } from './user-data-service.js';
 import { createWatchService } from '../watch/watch-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createReviewService } from '../reviews/review-service.js';
+import { createCommentService } from '../comments/comment-service.js';
 import { importRatingsFromFilmtipset } from './import-service.js';
 import { USER_FILTER_VALUES } from './movie-types.js';
 import type { SortBy, UserFilterValue } from './movie-types.js';
@@ -37,6 +38,15 @@ const ratingBodySchema = z.object({
 
 const reviewBodySchema = z.object({
   content: z.string().min(1).max(5000),
+});
+
+const commentBodySchema = z.object({
+  content: z.string().min(1).max(1000),
+});
+
+const deleteCommentParamsSchema = z.object({
+  tmdbId: z.coerce.number().int().positive(),
+  commentId: z.coerce.number().int().positive(),
 });
 
 const importBodySchema = z.object({
@@ -125,6 +135,46 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
         request.user.userId
       );
       return reply.send(data);
+    }
+  );
+
+  fastify.get('/:tmdbId/comments', { schema: { params: paramsSchema } }, async (request, reply) => {
+    const commentService = createCommentService({ logger: request.log });
+    const comments = await commentService.getCommentsForMovie(request.params.tmdbId);
+    return reply.send(comments);
+  });
+
+  fastify.post(
+    '/:tmdbId/comments',
+    {
+      preHandler: authenticate,
+      schema: { params: paramsSchema, body: commentBodySchema },
+    },
+    async (request, reply) => {
+      const commentService = createCommentService({ logger: request.log });
+      const comment = await commentService.createComment(
+        request.params.tmdbId,
+        request.user.userId,
+        request.body.content
+      );
+      return reply.send(comment);
+    }
+  );
+
+  fastify.delete(
+    '/:tmdbId/comments/:commentId',
+    {
+      preHandler: authenticate,
+      schema: { params: deleteCommentParamsSchema },
+    },
+    async (request, reply) => {
+      const commentService = createCommentService({ logger: request.log });
+      await commentService.deleteComment(
+        request.params.tmdbId,
+        request.params.commentId,
+        request.user.userId
+      );
+      return reply.code(204).send();
     }
   );
 
