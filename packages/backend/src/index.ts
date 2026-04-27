@@ -12,11 +12,11 @@ import { movieRoutes } from './movies/movie-routes.js';
 
 const logger = LOGGER.child({ module: 'index' });
 
-const server = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
+const server = Fastify({ loggerInstance: LOGGER }).withTypeProvider<ZodTypeProvider>();
 server.setValidatorCompiler(validatorCompiler);
 server.setSerializerCompiler(serializerCompiler);
 
-server.setErrorHandler((error: unknown, _request, reply) => {
+server.setErrorHandler((error: unknown, request, reply) => {
   if (error instanceof Error && error.constructor.name === 'ZodError') {
     return reply.code(400).send({ error: 'Validation error' });
   }
@@ -26,7 +26,7 @@ server.setErrorHandler((error: unknown, _request, reply) => {
     if (typeof fastifyError.statusCode === 'number' && fastifyError.statusCode < 500) {
       return reply.code(fastifyError.statusCode).send({ error: error.message });
     }
-    logger.error({ message: error.message, stack: error.stack }, 'Unhandled server error');
+    request.log.error({ message: error.message, stack: error.stack }, 'Unhandled server error');
   }
 
   return reply.code(500).send({ error: 'Internal server error' });
