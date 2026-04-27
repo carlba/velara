@@ -50,19 +50,33 @@ export function createUserDataService(options?: ServiceOptions) {
       if (sortBy === 'watched_date') {
         const entries = await prisma.watchEntry.findMany({
           where: { userId },
-          orderBy: { watchedAt: 'desc' },
+          orderBy: [{ watchedAt: 'desc' }, { tmdbId: 'desc' }],
           select: { tmdbId: true },
         });
-        return entries.map(entry => entry.tmdbId);
+        const orderedIds = entries.map(entry => entry.tmdbId);
+        const additionalFilters = filters.filter(filter => filter !== 'watched');
+        if (additionalFilters.length === 0) return orderedIds;
+        const additionalIdSets = await Promise.all(
+          additionalFilters.map(filter => fetchIdsForFilter(userId, filter))
+        );
+        const additionalIds = new Set(additionalIdSets.flat());
+        return orderedIds.filter((id: number) => additionalIds.has(id));
       }
 
       if (sortBy === 'my_rating') {
         const entries = await prisma.rating.findMany({
           where: { userId },
-          orderBy: { score: 'desc' },
+          orderBy: [{ score: 'desc' }, { tmdbId: 'desc' }],
           select: { tmdbId: true },
         });
-        return entries.map(entry => entry.tmdbId);
+        const orderedIds = entries.map(entry => entry.tmdbId);
+        const additionalFilters = filters.filter(filter => filter !== 'rated');
+        if (additionalFilters.length === 0) return orderedIds;
+        const additionalIdSets = await Promise.all(
+          additionalFilters.map(filter => fetchIdsForFilter(userId, filter))
+        );
+        const additionalIds = new Set(additionalIdSets.flat());
+        return orderedIds.filter((id: number) => additionalIds.has(id));
       }
 
       const idSets = await Promise.all(filters.map(filter => fetchIdsForFilter(userId, filter)));
