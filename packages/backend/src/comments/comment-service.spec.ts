@@ -66,6 +66,58 @@ describe('comment service', () => {
     });
   });
 
+  it('creates a comment with an explicit createdAt date', async () => {
+    const createdAt = new Date('2024-01-01T12:00:00Z');
+    const comment = {
+      id: 12,
+      tmdbId: 123,
+      content: 'Great',
+      createdAt,
+      updatedAt: createdAt,
+      user: { id: 5, username: 'bob' },
+    };
+    createMock.mockResolvedValue(comment);
+
+    const { createCommentService } = await import('./comment-service.js');
+    const service = createCommentService({ logger: loggerMock });
+
+    expect(await service.createComment(123, 5, 'Great', createdAt)).toBe(comment);
+    expect(createMock).toHaveBeenCalledWith({
+      data: { tmdbId: 123, userId: 5, content: 'Great', createdAt },
+      include: { user: { select: { id: true, username: true } } },
+    });
+  });
+
+  it('creates a comment with an explicit importedAt date', async () => {
+    const createdAt = new Date('2024-01-01T12:00:00Z');
+    const importedAt = new Date('2024-06-01T12:00:00Z');
+    const comment = {
+      id: 13,
+      tmdbId: 123,
+      content: 'Imported',
+      createdAt,
+      updatedAt: createdAt,
+      importedAt,
+      user: { id: 5, username: 'bob' },
+    };
+    createMock.mockResolvedValue(comment);
+
+    const { createCommentService } = await import('./comment-service.js');
+    const service = createCommentService({ logger: loggerMock });
+
+    expect(await service.createComment(123, 5, 'Imported', createdAt, importedAt)).toBe(comment);
+    expect(createMock).toHaveBeenCalledWith({
+      data: {
+        tmdbId: 123,
+        userId: 5,
+        content: 'Imported',
+        createdAt,
+        importedAt,
+      },
+      include: { user: { select: { id: true, username: true } } },
+    });
+  });
+
   it('throws when deleteComment does not delete any rows', async () => {
     deleteManyMock.mockResolvedValue({ count: 0 });
 

@@ -15,11 +15,23 @@ interface ParsedRow {
   line: number;
 }
 
+interface ParsedCommentRow {
+  imdbId: string;
+  watchedAt: Date;
+  title: string;
+  comment: string;
+  line: number;
+}
+
 let normalizeImdbId: (value: string) => string | null;
 let parseFilmtipsetRows: (
   content: string,
   logger: ImportLogger
 ) => { rows: ParsedRow[]; errors: string[] };
+let parseFilmtipsetCommentRows: (
+  content: string,
+  logger: ImportLogger
+) => { rows: ParsedCommentRow[]; errors: string[] };
 
 interface ImportLogger {
   error: (...args: unknown[]) => void;
@@ -29,6 +41,7 @@ beforeAll(async () => {
   const importService = await import('./import-service.js');
   normalizeImdbId = importService.normalizeImdbId;
   parseFilmtipsetRows = importService.parseFilmtipsetRows;
+  parseFilmtipsetCommentRows = importService.parseFilmtipsetCommentRows;
 });
 
 afterAll(() => {
@@ -63,5 +76,25 @@ describe('import service helpers', () => {
     expect(result.rows).toEqual([]);
     expect(result.errors).toEqual(['Line 1: invalid IMDB id']);
     expect(logger.error).toHaveBeenCalledWith({ line: 1, rawImdb: '455' }, 'Invalid IMDB id value');
+  });
+
+  it('parses Filmtipset comment rows with a header', () => {
+    const logger = { error: vi.fn() };
+    const content =
+      'Date;Movie;IMDB;Text\n2018-05-20;Captain Fantastic - En annorlunda pappa;3553976;"Tänkvärd film"';
+
+    const result = parseFilmtipsetCommentRows(content, logger);
+
+    expect(result.rows).toEqual([
+      {
+        imdbId: 'tt3553976',
+        title: 'Captain Fantastic - En annorlunda pappa',
+        watchedAt: new Date('2018-05-20'),
+        comment: 'Tänkvärd film',
+        line: 2,
+      },
+    ]);
+    expect(result.errors).toEqual([]);
+    expect(logger.error).not.toHaveBeenCalled();
   });
 });

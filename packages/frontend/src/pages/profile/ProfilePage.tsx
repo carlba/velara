@@ -5,14 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
-import { importRatings, type ImportSummary } from '@/services/user-data-api';
+import { importFilmtipset, type ImportSummary } from '@/services/user-data-api';
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [content, setContent] = useState('');
+  const [importType, setImportType] = useState<'ratings' | 'comments'>('ratings');
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
 
@@ -39,10 +47,10 @@ export default function ProfilePage() {
     setSummary(null);
 
     try {
-      const result = await importRatings(content);
+      const result = await importFilmtipset(content, importType);
       setSummary(result);
       if (result.errors.length === 0) {
-        toast.success('Ratings imported successfully');
+        toast.success(`${importType === 'ratings' ? 'Ratings' : 'Comments'} imported successfully`);
       } else {
         toast.success('Import completed with some skipped rows');
       }
@@ -83,19 +91,34 @@ export default function ProfilePage() {
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
         <p className="text-muted-foreground">
-          Import movie ratings from filmtipset.se to your account.
+          Import movie ratings or comments from filmtipset.se to your account.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Import ratings</CardTitle>
+          <CardTitle>Import Filmtipset export</CardTitle>
           <CardDescription>
             Paste your Filmtipset CSV content below or choose a file to load. The import will create
-            ratings and watched entries automatically.
+            ratings, comments, and watched entries automatically.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="importType">Import type</Label>
+            <Select
+              value={importType}
+              onValueChange={value => setImportType(value as 'ratings' | 'comments')}>
+              <SelectTrigger id="importType">
+                <SelectValue placeholder="Select import type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ratings">Ratings</SelectItem>
+                <SelectItem value="comments">Comments</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="file">File upload</Label>
             <Input
@@ -118,7 +141,9 @@ export default function ProfilePage() {
           </div>
 
           <Button onClick={handleImport} disabled={isLoading}>
-            {isLoading ? 'Importing…' : 'Import ratings'}
+            {isLoading
+              ? 'Importing…'
+              : `Import ${importType === 'ratings' ? 'ratings' : 'comments'}`}
           </Button>
 
           {summary ? (

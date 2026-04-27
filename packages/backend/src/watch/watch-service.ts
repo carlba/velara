@@ -27,6 +27,21 @@ export function createWatchService(options?: ServiceOptions) {
       });
     },
 
+    async createWatchEntryIfMissing(tmdbId: number, userId: number, watchedAt: Date) {
+      const logger = localLogger('createWatchEntryIfMissing');
+      logger.debug({ tmdbId, userId, watchedAt }, 'Creating watch entry only if missing');
+
+      const existing = await prisma.watchEntry.findUnique({
+        where: { tmdbId_userId: { tmdbId, userId } },
+      });
+
+      if (existing) return existing;
+
+      return prisma.watchEntry.create({
+        data: { tmdbId, userId, watchedAt },
+      });
+    },
+
     async deleteWatchEntry(tmdbId: number, userId: number) {
       const logger = localLogger('deleteWatchEntry');
       logger.debug({ tmdbId, userId }, 'Deleting watch entry');

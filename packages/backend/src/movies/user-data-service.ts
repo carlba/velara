@@ -31,7 +31,15 @@ export function createUserDataService(options?: ServiceOptions) {
       })) as { tmdbId: number }[];
       return records.map(record => record.tmdbId);
     }
-    const records = (await prisma.review.findMany({
+    if (filter === 'reviewed') {
+      const records = (await prisma.review.findMany({
+        where: { userId },
+        select: { tmdbId: true },
+      })) as { tmdbId: number }[];
+      return records.map(record => record.tmdbId);
+    }
+
+    const records = (await prisma.comment.findMany({
       where: { userId },
       select: { tmdbId: true },
     })) as { tmdbId: number }[];
