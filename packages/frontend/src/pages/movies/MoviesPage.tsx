@@ -50,9 +50,14 @@ export default function MoviesPage() {
   };
 
   const handleFilterChange = (filter: UserFilter) => {
-    setUserFilters(prev =>
-      prev.includes(filter) ? prev.filter(f => f !== filter) : [...prev, filter]
+    const isRemoving = userFilters.includes(filter);
+    setUserFilters(currentFilters =>
+      isRemoving ? currentFilters.filter(f => f !== filter) : [...currentFilters, filter]
     );
+    if (isRemoving) {
+      if (filter === 'watched' && sortBy === 'watched_date') setSortBy('popularity');
+      if (filter === 'rated' && sortBy === 'my_rating') setSortBy('popularity');
+    }
     setPage(1);
   };
 

@@ -62,6 +62,12 @@ export default function MovieSearch({
           <SelectContent>
             <SelectItem value="popularity">Most Popular</SelectItem>
             <SelectItem value="rating">Highest Rated</SelectItem>
+            <SelectItem value="watched_date" disabled={!userFilters.includes('watched')}>
+              My Watched Date
+            </SelectItem>
+            <SelectItem value="my_rating" disabled={!userFilters.includes('rated')}>
+              My Highest Rated
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

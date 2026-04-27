@@ -72,7 +72,7 @@ export interface MovieDetail extends MovieListItem {
   rtSearchUrl: string;
 }
 
-export type SortBy = 'popularity' | 'rating';
+export type SortBy = 'popularity' | 'rating' | 'watched_date' | 'my_rating';
 
 export const USER_FILTER_VALUES = ['rated', 'watched', 'reviewed'] as const;
 export type UserFilterValue = (typeof USER_FILTER_VALUES)[number];

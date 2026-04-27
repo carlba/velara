@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
-import type { UserFilterValue } from './movie-types.js';
+import type { SortBy, UserFilterValue } from './movie-types.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -16,37 +16,57 @@ export function createUserDataService(options?: ServiceOptions) {
   const localLogger = (context: string) =>
     serviceLogger.child({ module: 'user-data-service', context });
 
+  async function fetchIdsForFilter(userId: number, filter: UserFilterValue): Promise<number[]> {
+    if (filter === 'rated') {
+      const records = await prisma.rating.findMany({
+        where: { userId },
+        select: { tmdbId: true },
+      });
+      return records.map(record => record.tmdbId);
+    }
+    if (filter === 'watched') {
+      const records = await prisma.watchEntry.findMany({
+        where: { userId },
+        select: { tmdbId: true },
+      });
+      return records.map(record => record.tmdbId);
+    }
+    const records = await prisma.review.findMany({
+      where: { userId },
+      select: { tmdbId: true },
+    });
+    return records.map(record => record.tmdbId);
+  }
+
   return {
-    async getFilteredTmdbIds(userId: number, filters: UserFilterValue[]): Promise<number[]> {
+    async getFilteredTmdbIds(
+      userId: number,
+      filters: UserFilterValue[],
+      sortBy?: SortBy
+    ): Promise<number[]> {
       const logger = localLogger('getFilteredTmdbIds');
-      logger.debug({ userId, filters }, 'Fetching filtered tmdb IDs');
+      logger.debug({ userId, filters, sortBy }, 'Fetching filtered tmdb IDs');
 
-      const idSets = await Promise.all(
-        filters.map(async filter => {
-          if (filter === 'rated') {
-            const records = await prisma.rating.findMany({
-              where: { userId },
-              select: { tmdbId: true },
-            });
-            return records.map(({ tmdbId }: { tmdbId: number }) => tmdbId);
-          }
-          if (filter === 'watched') {
-            const records = await prisma.watchEntry.findMany({
-              where: { userId },
-              select: { tmdbId: true },
-            });
-            return records.map(({ tmdbId }: { tmdbId: number }) => tmdbId);
-          }
-          const records = await prisma.review.findMany({
-            where: { userId },
-            select: { tmdbId: true },
-          });
-          return records.map(({ tmdbId }: { tmdbId: number }) => tmdbId);
-        })
-      );
+      if (sortBy === 'watched_date') {
+        const entries = await prisma.watchEntry.findMany({
+          where: { userId },
+          orderBy: { watchedAt: 'desc' },
+          select: { tmdbId: true },
+        });
+        return entries.map(entry => entry.tmdbId);
+      }
 
-      const unique = new Set(idSets.flat());
-      return Array.from(unique);
+      if (sortBy === 'my_rating') {
+        const entries = await prisma.rating.findMany({
+          where: { userId },
+          orderBy: { score: 'desc' },
+          select: { tmdbId: true },
+        });
+        return entries.map(entry => entry.tmdbId);
+      }
+
+      const idSets = await Promise.all(filters.map(filter => fetchIdsForFilter(userId, filter)));
+      return Array.from(new Set(idSets.flat()));
     },
 
     async getUserMovieData(tmdbId: number, userId: number) {

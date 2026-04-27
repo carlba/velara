@@ -15,7 +15,7 @@ const listQuerySchema = z.object({
   search: z.string().optional(),
   tmdb_id: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().int().positive().default(1),
-  sort_by: z.enum(['popularity', 'rating']).default('popularity'),
+  sort_by: z.enum(['popularity', 'rating', 'watched_date', 'my_rating']).default('popularity'),
   user_filter: z
     .string()
     .transform(raw => raw.split(',').filter(Boolean))
@@ -68,7 +68,11 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
       }
 
       const userDataService = createUserDataService({ logger: request.log });
-      const tmdbIds = await userDataService.getFilteredTmdbIds(request.user.userId, user_filter);
+      const tmdbIds = await userDataService.getFilteredTmdbIds(
+        request.user.userId,
+        user_filter,
+        sort_by
+      );
 
       if (tmdbIds.length === 0) {
         return reply.send({ results: [], page: 1, total_pages: 1, total_results: 0 });
