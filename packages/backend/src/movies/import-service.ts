@@ -71,10 +71,10 @@ export function parseFilmtipsetRows(
       continue;
     }
 
-    let rawDate = '';
-    let title = '';
-    let imdbRaw = '';
-    let scoreRaw = '';
+    let rawDate: string;
+    let title: string;
+    let imdbRaw: string;
+    let scoreRaw: string;
 
     if (rawLine.length === 4) {
       [rawDate, title, imdbRaw, scoreRaw] = rawLine;

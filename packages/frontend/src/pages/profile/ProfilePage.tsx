@@ -46,7 +46,7 @@ export default function ProfilePage() {
       } else {
         toast.success('Import completed with some skipped rows');
       }
-    } catch (error) {
+    } catch {
       toast.error('Import failed. Check the file format and try again.');
     } finally {
       setIsLoading(false);

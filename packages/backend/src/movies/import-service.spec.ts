@@ -7,8 +7,19 @@ process.env.TMDB_API_KEY = 'test-tmdb-key';
 process.env.OMDB_API_KEY = 'test-omdb-key';
 process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-chars!!';
 
+interface ParsedRow {
+  imdbId: string;
+  score: number;
+  watchedAt: Date;
+  title: string;
+  line: number;
+}
+
 let normalizeImdbId: (value: string) => string | null;
-let parseFilmtipsetRows: any;
+let parseFilmtipsetRows: (
+  content: string,
+  logger: { error: (...args: unknown[]) => void }
+) => { rows: ParsedRow[]; errors: string[] };
 
 beforeAll(async () => {
   const importService = await import('./import-service.js');
