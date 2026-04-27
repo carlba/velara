@@ -34,6 +34,8 @@ After any change, run these commands in order before considering the task done:
 1. Review `README.md` and update it if the change affects documentation or usage.
 2. `npm run lint`
 3. `npm run build`
+4. If you change the Prisma schema, run `cd packages/backend && npm run db:generate` to regenerate
+   the client.
 
 Fix any failures and rerun both commands before completing the task.
 
