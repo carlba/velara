@@ -18,8 +18,12 @@ interface ParsedRow {
 let normalizeImdbId: (value: string) => string | null;
 let parseFilmtipsetRows: (
   content: string,
-  logger: { error: (...args: unknown[]) => void }
+  logger: ImportLogger
 ) => { rows: ParsedRow[]; errors: string[] };
+
+interface ImportLogger {
+  error: (...args: unknown[]) => void;
+}
 
 beforeAll(async () => {
   const importService = await import('./import-service.js');
@@ -58,9 +62,6 @@ describe('import service helpers', () => {
 
     expect(result.rows).toEqual([]);
     expect(result.errors).toEqual(['Line 1: invalid IMDB id']);
-    expect(logger.error).toHaveBeenCalledWith(
-      { line: 1, rawImdb: '455' },
-      'Invalid IMDB id value'
-    );
+    expect(logger.error).toHaveBeenCalledWith({ line: 1, rawImdb: '455' }, 'Invalid IMDB id value');
   });
 });

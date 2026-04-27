@@ -18,23 +18,23 @@ export function createUserDataService(options?: ServiceOptions) {
 
   async function fetchIdsForFilter(userId: number, filter: UserFilterValue): Promise<number[]> {
     if (filter === 'rated') {
-      const records = await prisma.rating.findMany({
+      const records = (await prisma.rating.findMany({
         where: { userId },
         select: { tmdbId: true },
-      });
+      })) as { tmdbId: number }[];
       return records.map(record => record.tmdbId);
     }
     if (filter === 'watched') {
-      const records = await prisma.watchEntry.findMany({
+      const records = (await prisma.watchEntry.findMany({
         where: { userId },
         select: { tmdbId: true },
-      });
+      })) as { tmdbId: number }[];
       return records.map(record => record.tmdbId);
     }
-    const records = await prisma.review.findMany({
+    const records = (await prisma.review.findMany({
       where: { userId },
       select: { tmdbId: true },
-    });
+    })) as { tmdbId: number }[];
     return records.map(record => record.tmdbId);
   }
 
@@ -48,11 +48,11 @@ export function createUserDataService(options?: ServiceOptions) {
       logger.debug({ userId, filters, sortBy }, 'Fetching filtered tmdb IDs');
 
       if (sortBy === 'watched_date') {
-        const entries = await prisma.watchEntry.findMany({
+        const entries = (await prisma.watchEntry.findMany({
           where: { userId },
           orderBy: [{ watchedAt: 'desc' }, { tmdbId: 'desc' }],
           select: { tmdbId: true },
-        });
+        })) as { tmdbId: number }[];
         const orderedIds = entries.map(entry => entry.tmdbId);
         const intersectionFilters = filters.filter(filter => filter !== 'watched');
         if (intersectionFilters.length === 0) return orderedIds;
@@ -64,11 +64,11 @@ export function createUserDataService(options?: ServiceOptions) {
       }
 
       if (sortBy === 'my_rating') {
-        const entries = await prisma.rating.findMany({
+        const entries = (await prisma.rating.findMany({
           where: { userId },
           orderBy: [{ score: 'desc' }, { tmdbId: 'desc' }],
           select: { tmdbId: true },
-        });
+        })) as { tmdbId: number }[];
         const orderedIds = entries.map(entry => entry.tmdbId);
         const intersectionFilters = filters.filter(filter => filter !== 'rated');
         if (intersectionFilters.length === 0) return orderedIds;

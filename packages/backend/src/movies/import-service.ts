@@ -6,10 +6,12 @@ import { createMovieService } from './movie-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createWatchService } from '../watch/watch-service.js';
 
-type ServiceLogger = Logger | FastifyBaseLogger;
+interface ImportLogger {
+  error: (...args: unknown[]) => void;
+}
 
 interface ServiceOptions {
-  logger?: ServiceLogger;
+  logger?: Logger | FastifyBaseLogger;
 }
 
 export interface ImportSummary {
@@ -38,7 +40,7 @@ export function normalizeImdbId(value: string): string | null {
 
 export function parseFilmtipsetRows(
   content: string,
-  logger: ServiceLogger
+  logger: ImportLogger
 ): { rows: ParsedRow[]; errors: string[] } {
   const records = parse(content, {
     delimiter: ';',
