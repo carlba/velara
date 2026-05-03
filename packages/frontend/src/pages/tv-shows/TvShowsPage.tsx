@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +14,13 @@ import { Search } from 'lucide-react';
 import TvShowGrid from '@/components/tv-shows/TvShowGrid';
 import { useTvShows } from '@/hooks/useTvShows';
 import { useAuth } from '@/hooks/useAuth';
+import { buildUrlSearchParams, parseUrlFilterParam, parseUrlSortParam } from '@/lib/query-params';
 import type { TvSortBy, TvUserFilter } from '@/types/tv-show';
 
 const DEBOUNCE_MS = 400;
+const DEFAULT_TV_SORT: TvSortBy = 'popularity';
+const ALLOWED_TV_FILTERS = ['rated', 'watched', 'reviewed', 'commented'] as const;
+const ALLOWED_TV_SORTS = ['popularity', 'rating', 'watched_date', 'my_rating'] as const;
 
 const USER_FILTER_LABELS: Record<TvUserFilter, string> = {
   rated: 'Rated by me',
@@ -26,10 +31,15 @@ const USER_FILTER_LABELS: Record<TvUserFilter, string> = {
 
 export default function TvShowsPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState<TvSortBy>('popularity');
-  const [userFilters, setUserFilters] = useState<TvUserFilter[]>([]);
+  const [sortBy, setSortBy] = useState<TvSortBy>(() =>
+    parseUrlSortParam(searchParams, 'sort', ALLOWED_TV_SORTS, DEFAULT_TV_SORT)
+  );
+  const [userFilters, setUserFilters] = useState<TvUserFilter[]>(() =>
+    parseUrlFilterParam(searchParams, 'filter', ALLOWED_TV_FILTERS)
+  );
   const [page, setPage] = useState(1);
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,21 +65,61 @@ export default function TvShowsPage() {
     [debounceTimer]
   );
 
+  useEffect(() => {
+    const nextSortBy = parseUrlSortParam(searchParams, 'sort', ALLOWED_TV_SORTS, DEFAULT_TV_SORT);
+    const nextUserFilters = parseUrlFilterParam(searchParams, 'filter', ALLOWED_TV_FILTERS);
+
+    if (nextSortBy !== sortBy) {
+      setSortBy(nextSortBy);
+    }
+
+    if (
+      nextUserFilters.length !== userFilters.length ||
+      nextUserFilters.some((value, index) => userFilters[index] !== value)
+    ) {
+      setUserFilters(nextUserFilters);
+    }
+  }, [searchParams, sortBy, userFilters]);
+
   const handleSortChange = (sort: TvSortBy) => {
     setSortBy(sort);
     setPage(1);
+    setSearchParams(
+      buildUrlSearchParams(searchParams, 'filter', 'sort', userFilters, sort, DEFAULT_TV_SORT),
+      { replace: true }
+    );
   };
 
   const handleFilterChange = (filter: TvUserFilter) => {
     const isRemoving = userFilters.includes(filter);
-    setUserFilters(current =>
-      isRemoving ? current.filter(f => f !== filter) : [...current, filter]
-    );
+    const nextFilters = isRemoving
+      ? userFilters.filter(f => f !== filter)
+      : [...userFilters, filter];
+
+    let nextSortBy = sortBy;
     if (isRemoving) {
-      if (filter === 'watched' && sortBy === 'watched_date') setSortBy('popularity');
-      if (filter === 'rated' && sortBy === 'my_rating') setSortBy('popularity');
+      if (filter === 'watched' && sortBy === 'watched_date') {
+        nextSortBy = DEFAULT_TV_SORT;
+      }
+      if (filter === 'rated' && sortBy === 'my_rating') {
+        nextSortBy = DEFAULT_TV_SORT;
+      }
     }
+
+    setUserFilters(nextFilters);
+    setSortBy(nextSortBy);
     setPage(1);
+    setSearchParams(
+      buildUrlSearchParams(
+        searchParams,
+        'filter',
+        'sort',
+        nextFilters,
+        nextSortBy,
+        DEFAULT_TV_SORT
+      ),
+      { replace: true }
+    );
   };
 
   const totalPages = data?.total_pages ?? 1;
