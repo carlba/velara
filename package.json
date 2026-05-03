@@ -13,6 +13,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "start:dev": "concurrently \"npm --workspace packages/backend run start:dev\" \"npm --workspace packages/frontend run start:dev\"",
+    "db:truncate-except-users": "npm --workspace packages/backend run db:truncate-except-users",
     "format": "prettier --write .",
     "linux:install": "docker run --rm --platform linux/amd64 -v \"$PWD\":/app -w /app node:24-bullseye npm install",
     "linux:ci": "docker run --rm --platform linux/amd64 -v \"$PWD\":/app -w /app node:24-bullseye bash -lc \"npm ci && npm run lint && npm test && npm run build\""
