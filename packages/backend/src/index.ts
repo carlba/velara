@@ -13,7 +13,10 @@ import { movieRoutes } from './movies/movie-routes.js';
 
 const logger = LOGGER.child({ module: 'index' });
 
-const server = Fastify({ loggerInstance: LOGGER }).withTypeProvider<ZodTypeProvider>();
+const server = Fastify({
+  loggerInstance: LOGGER,
+  bodyLimit: 50 * 1024 * 1024,
+}).withTypeProvider<ZodTypeProvider>();
 server.setValidatorCompiler(validatorCompiler);
 server.setSerializerCompiler(serializerCompiler);
 

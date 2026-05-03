@@ -50,7 +50,7 @@ describe('watch service', () => {
 
     expect(result).toBe(createdEntry);
     expect(createMock).toHaveBeenCalledWith({
-      data: { tmdbId: 12, userId: 34, watchedAt: new Date('2024-01-01') },
+      data: { tmdbId: 12, userId: 34, watchedAt: new Date('2024-01-01'), source: 'manual' },
     });
   });
 });
