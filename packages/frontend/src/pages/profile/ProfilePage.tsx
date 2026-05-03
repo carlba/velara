@@ -15,6 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { importMovies, type ImportProvider, type ImportSummary } from '@/services/user-data-api';
+import { importTvShows } from '@/services/user-tv-data-api';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -24,6 +25,11 @@ export default function ProfilePage() {
   const [importType, setImportType] = useState<'ratings' | 'comments'>('ratings');
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+
+  const tvFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [tvContent, setTvContent] = useState('');
+  const [tvIsLoading, setTvIsLoading] = useState(false);
+  const [tvSummary, setTvSummary] = useState<ImportSummary | null>(null);
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -71,6 +77,40 @@ export default function ProfilePage() {
       toast.error('Import failed. Check the file format and try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTvFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setTvContent(text);
+      toast.success(`Loaded ${file.name}`);
+    } catch {
+      toast.error('Unable to read selected file');
+    }
+  };
+
+  const handleTvImport = async () => {
+    if (!tvContent.trim()) {
+      toast.error('Please paste or select a file before importing.');
+      return;
+    }
+    setTvIsLoading(true);
+    setTvSummary(null);
+    try {
+      const result = await importTvShows(tvContent);
+      setTvSummary(result);
+      if (result.errors.length === 0) {
+        toast.success('Trakt TV show data imported successfully');
+      } else {
+        toast.success('Import completed with some skipped rows');
+      }
+    } catch {
+      toast.error('Import failed. Check the file format and try again.');
+    } finally {
+      setTvIsLoading(false);
     }
   };
 
@@ -193,6 +233,60 @@ export default function ProfilePage() {
                   <p className="font-semibold">Errors</p>
                   <ul className="list-disc pl-5 text-sm text-muted-foreground">
                     {summary.errors.map((message, index) => (
+                      <li key={index}>{message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Import TV show data</CardTitle>
+          <CardDescription>
+            Paste your Trakt JSON export below, or choose a file to load. The import will create
+            show ratings and episode watch history.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="tv-file">File upload</Label>
+            <Input
+              id="tv-file"
+              type="file"
+              accept=".json,text/plain,application/json"
+              ref={tvFileInputRef}
+              onChange={handleTvFileChange}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="tv-content">Trakt JSON export</Label>
+            <Textarea
+              id="tv-content"
+              value={tvContent}
+              onChange={event => setTvContent(event.target.value)}
+              placeholder="Paste your Trakt export JSON here"
+            />
+          </div>
+
+          <Button onClick={handleTvImport} disabled={tvIsLoading}>
+            {tvIsLoading ? 'Importing…' : 'Import Trakt TV data'}
+          </Button>
+
+          {tvSummary ? (
+            <div className="rounded-lg border border-muted p-4">
+              <p className="font-semibold">Import summary</p>
+              <p>Imported: {tvSummary.importedCount}</p>
+              <p>Skipped: {tvSummary.skippedCount}</p>
+              {tvSummary.errors.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="font-semibold">Errors</p>
+                  <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                    {tvSummary.errors.map((message, index) => (
                       <li key={index}>{message}</li>
                     ))}
                   </ul>
