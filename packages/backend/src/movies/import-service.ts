@@ -7,6 +7,8 @@ import { createCommentService } from '../comments/comment-service.js';
 import { createMovieService } from './movie-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createWatchService } from '../watch/watch-service.js';
+import { createTvRatingService } from '../tv-shows/tv-rating-service.js';
+import { createTvWatchService } from '../tv-shows/tv-watch-service.js';
 import type {
   TraktExport,
   TraktMovie,
@@ -87,6 +89,8 @@ type ParsedCsvResult<T> =
 
 type TraktMovieRatingEntry = Extract<TraktRatingEntry, { type: 'movie' }>;
 type TraktMovieHistoryEntry = Extract<TraktHistoryEntry, { type: 'movie' }>;
+type TraktShowRatingEntry = Extract<TraktRatingEntry, { type: 'show' }>;
+type TraktEpisodeHistoryEntry = Extract<TraktHistoryEntry, { type: 'episode' }>;
 
 function normalizeFilmtipsetCsvRow(rawLine: unknown[]): unknown[] {
   if (rawLine.length === 3 && typeof rawLine[0] === 'string' && rawLine[0].includes(',')) {
@@ -312,6 +316,71 @@ async function importFromTraktExport(
     } catch (error) {
       logger.error({ err: error, row }, 'Failed to import Trakt watch history');
       errors.push('Watch import failed');
+      skippedCount += 1;
+    }
+  }
+
+  // Import TV show ratings (show-level, seasonNumber=0)
+  const tvRatingService = createTvRatingService({ logger });
+  const tvRatingRows = traktExport.ratings
+    .filter((entry): entry is TraktShowRatingEntry => entry.type === 'show')
+    .filter(entry => typeof entry.show.ids?.tmdb === 'number');
+
+  for (const entry of tvRatingRows) {
+    const seriesTmdbId = String(entry.show.ids.tmdb!);
+    const ratedAt = new Date(entry.rated_at);
+    if (Number.isNaN(ratedAt.getTime())) {
+      errors.push(`TV rating import skipped: invalid date for series ${seriesTmdbId}`);
+      skippedCount += 1;
+      continue;
+    }
+    try {
+      await tvRatingService.upsertTvRating(
+        seriesTmdbId,
+        0,
+        userId,
+        entry.rating,
+        ratedAt,
+        importTimestamp,
+        TRAKT_SOURCE
+      );
+      importedCount += 1;
+    } catch (error) {
+      logger.error({ err: error, entry }, 'Failed to import Trakt TV rating');
+      errors.push('TV rating import failed');
+      skippedCount += 1;
+    }
+  }
+
+  // Import TV episode watch history
+  const tvWatchService = createTvWatchService({ logger });
+  const episodeHistoryRows = traktExport.history
+    .filter((entry): entry is TraktEpisodeHistoryEntry => entry.type === 'episode')
+    .filter(entry => typeof entry.show.ids?.tmdb === 'number');
+
+  for (const entry of episodeHistoryRows) {
+    const seriesTmdbId = String(entry.show.ids.tmdb!);
+    const watchedAt = new Date(entry.watched_at);
+    if (Number.isNaN(watchedAt.getTime())) {
+      errors.push(
+        `TV watch import skipped: invalid date for series ${seriesTmdbId} S${entry.episode.season}E${entry.episode.number}`
+      );
+      skippedCount += 1;
+      continue;
+    }
+    try {
+      await tvWatchService.createWatchEntryIfMissing(
+        seriesTmdbId,
+        entry.episode.season,
+        entry.episode.number,
+        userId,
+        watchedAt,
+        TRAKT_SOURCE
+      );
+      importedCount += 1;
+    } catch (error) {
+      logger.error({ err: error, entry }, 'Failed to import Trakt TV episode history');
+      errors.push('TV episode watch import failed');
       skippedCount += 1;
     }
   }

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Film, LogOut, User } from 'lucide-react';
+import { Film, LogOut, Tv, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -20,14 +20,25 @@ export default function Header() {
           <span>Velara</span>
         </Link>
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/movies" className="flex items-center gap-1.5 text-sm">
+              <Film className="h-4 w-4" />
+              <span className="hidden sm:inline">Movies</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/tv" className="flex items-center gap-1.5 text-sm">
+              <Tv className="h-4 w-4" />
+              <span className="hidden sm:inline">TV Shows</span>
+            </Link>
+          </Button>
           {user ? (
             <>
               <Button variant="ghost" size="sm" asChild>
                 <Link
                   to="/profile"
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground"
-                >
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <User className="h-4 w-4" />
                   {user.username}
                 </Link>
