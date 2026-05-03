@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import StarRating from '@/components/movies/StarRating';
+import ListActionPanel from '@/components/lists/ListActionPanel';
 import SeasonSection from '@/components/tv-shows/SeasonSection';
 import { useTvShowDetails } from '@/hooks/useTvShowDetails';
 import { useTvComments } from '@/hooks/useTvComments';
@@ -254,6 +255,8 @@ export default function TvShowDetailsPage() {
               )}
             </div>
           </div>
+
+          <ListActionPanel itemName="show" itemPayload={{ type: 'series', seriesTmdbId: id }} />
         </div>
       ) : (
         <div className="rounded-xl border bg-muted/50 p-6 text-center space-y-3">

@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import StarRating from '@/components/movies/StarRating';
+import ListActionPanel from '@/components/lists/ListActionPanel';
 import { useMovieDetails } from '@/hooks/useMovieDetails';
 import { useMovieComments } from '@/hooks/useMovieComments';
 import { useUserMovieData } from '@/hooks/useUserMovieData';
@@ -269,6 +270,11 @@ export default function MovieDetailsPage() {
               )}
             </div>
           </div>
+
+          <ListActionPanel
+            itemName="movie"
+            itemPayload={{ type: 'movie', movieTmdbId: movie.tmdbId }}
+          />
         </div>
       ) : (
         <div className="rounded-xl border bg-muted/50 p-6 text-center space-y-3">

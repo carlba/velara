@@ -11,6 +11,7 @@ import { config, LOGGER } from './registry.js';
 import { authRoutes } from './auth/auth-routes.js';
 import { movieRoutes } from './movies/movie-routes.js';
 import { tvRoutes } from './tv-shows/tv-show-routes.js';
+import { listRoutes } from './lists/list-routes.js';
 
 const logger = LOGGER.child({ module: 'index' });
 
@@ -56,6 +57,7 @@ await server.register(fastifyJwt, {
 await server.register(authRoutes, { prefix: '/api/auth' });
 await server.register(movieRoutes, { prefix: '/api/movies' });
 await server.register(tvRoutes, { prefix: '/api/tv' });
+await server.register(listRoutes, { prefix: '/api/lists' });
 
 server.get('/health', () => ({ status: 'ok' }));
 
