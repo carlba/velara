@@ -11,15 +11,19 @@ datasource db {
 }
 
 model User {
-  id           Int          @id @default(autoincrement())
-  email        String       @unique
-  username     String       @unique
-  passwordHash String
-  createdAt    DateTime     @default(now())
-  reviews      Review[]
-  comments     Comment[]
-  watchEntries WatchEntry[]
-  ratings      Rating[]
+  id             Int            @id @default(autoincrement())
+  email          String         @unique
+  username       String         @unique
+  passwordHash   String
+  createdAt      DateTime       @default(now())
+  reviews        Review[]
+  comments       Comment[]
+  watchEntries   WatchEntry[]
+  ratings        Rating[]
+  tvWatchEntries TvWatchEntry[]
+  tvRatings      TvRating[]
+  tvReviews      TvReview[]
+  tvComments     TvComment[]
 }
 
 model Review {
@@ -72,4 +76,59 @@ model Comment {
   importedAt DateTime?
 
   @@index([tmdbId])
+}
+
+model TvWatchEntry {
+  id            Int      @id @default(autoincrement())
+  seriesTmdbId  String
+  seasonNumber  Int
+  episodeNumber Int
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchedAt     DateTime
+  source        String   @default("manual")
+  createdAt     DateTime @default(now())
+
+  @@unique([seriesTmdbId, seasonNumber, episodeNumber, userId])
+}
+
+model TvRating {
+  id           Int       @id @default(autoincrement())
+  seriesTmdbId String
+  seasonNumber Int       @default(0)
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score        Int
+  source       String    @default("manual")
+  ratedAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  importedAt   DateTime?
+
+  @@unique([seriesTmdbId, seasonNumber, userId])
+}
+
+model TvReview {
+  id           Int      @id @default(autoincrement())
+  seriesTmdbId String
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([seriesTmdbId, userId])
+}
+
+model TvComment {
+  id           Int       @id @default(autoincrement())
+  seriesTmdbId String
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content      String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  importedAt   DateTime?
+
+  @@index([seriesTmdbId])
 }
