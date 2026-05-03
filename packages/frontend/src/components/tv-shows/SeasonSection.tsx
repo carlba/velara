@@ -40,7 +40,7 @@ export default function SeasonSection({
   };
 
   return (
-    <div className="border rounded-xl overflow-hidden">
+    <div className="border rounded-xl overflow-visible">
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
