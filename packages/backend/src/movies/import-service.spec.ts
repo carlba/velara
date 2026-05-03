@@ -1,9 +1,14 @@
-import { afterAll, beforeEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import * as importService from './import-service.js';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { parseFilmtipsetCsvRows as ParseFilmtipsetCsvRows } from './import-service.js';
 import { z } from 'zod';
 
 const originalEnv = { ...process.env };
+
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+process.env.TMDB_API_KEY = 'test-tmdb-key';
+process.env.OMDB_API_KEY = 'test-omdb-key';
+process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-chars!!';
 
 const findMovieByImdbIdMock = vi.fn();
 const upsertRatingMock = vi.fn();
@@ -19,10 +24,7 @@ vi.mock('../watch/watch-service.js', () => ({
   createWatchService: () => ({ createWatchEntryIfMissing: createWatchEntryIfMissingMock }),
 }));
 
-process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
-process.env.TMDB_API_KEY = 'test-tmdb-key';
-process.env.OMDB_API_KEY = 'test-omdb-key';
-process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-chars!!';
+let importService: typeof import('./import-service.js');
 
 interface RatingRow {
   imdbId: string;
@@ -48,7 +50,11 @@ let commentRowSchema: z.ZodType<{
   comment: string;
 }>;
 
-beforeAll(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  vi.clearAllMocks();
+
+  importService = await import('./import-service.js');
   normalizeImdbId = importService.normalizeImdbId;
   parseFilmtipsetCsvRows = importService.parseFilmtipsetCsvRows;
   ratingRowSchema = importService.ratingRowSchema;
@@ -151,11 +157,6 @@ describe('import service helpers', () => {
 });
 
 describe('Trakt import service', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.clearAllMocks();
-  });
-
   it('imports ratings and watch history from a valid Trakt JSON export', async () => {
     findMovieByImdbIdMock.mockResolvedValue({ success: true, tmdbId: 123 });
     upsertRatingMock.mockResolvedValue({});
@@ -196,7 +197,14 @@ describe('Trakt import service', () => {
     expect(summary.importedCount).toBe(2);
     expect(summary.skippedCount).toBe(0);
     expect(summary.errors).toEqual([]);
-    expect(upsertRatingMock).toHaveBeenCalledWith(123, 1, 8, expect.any(Date), 'trakt');
+    expect(upsertRatingMock).toHaveBeenCalledWith(
+      123,
+      1,
+      8,
+      expect.any(Date),
+      expect.any(Date),
+      'trakt'
+    );
     expect(createWatchEntryIfMissingMock).toHaveBeenCalledWith(
       123,
       1,
