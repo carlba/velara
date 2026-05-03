@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Film, LogOut, Tv, User } from 'lucide-react';
+import { Film, List, LogOut, Tv, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -31,6 +31,12 @@ export default function Header() {
             <Link to="/tv" className="flex items-center gap-1.5 text-sm">
               <Tv className="h-4 w-4" />
               <span className="hidden sm:inline">TV Shows</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/lists" className="flex items-center gap-1.5 text-sm">
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">Lists</span>
             </Link>
           </Button>
           {user ? (

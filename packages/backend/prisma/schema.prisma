@@ -24,6 +24,7 @@ model User {
   tvRatings      TvRating[]
   tvReviews      TvReview[]
   tvComments     TvComment[]
+  lists          List[]
 }
 
 model Review {
@@ -131,4 +132,35 @@ model TvComment {
   importedAt   DateTime?
 
   @@index([seriesTmdbId])
+}
+
+model List {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  creatorId   Int
+  creator     User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  items       ListItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model ListItem {
+  id            Int          @id @default(autoincrement())
+  list          List         @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId        Int
+  type          ListItemType
+  movieTmdbId   Int?
+  seriesTmdbId  String?
+  seasonNumber  Int?
+  episodeNumber Int?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+enum ListItemType {
+  movie
+  series
+  season
+  episode
 }
