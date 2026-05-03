@@ -1,6 +1,8 @@
 import { apiRequest } from './api-client';
 import type { UserMovieData } from '@/types/movie';
 
+export type ImportProvider = 'filmtipset' | 'trakt';
+
 export async function fetchUserMovieData(tmdbId: number): Promise<UserMovieData> {
   return apiRequest<UserMovieData>(`/api/movies/${tmdbId}/user-data`);
 }
@@ -44,14 +46,26 @@ export interface ImportSummary {
   errors: string[];
 }
 
+export async function importMovies(
+  content: string,
+  provider: ImportProvider,
+  type: 'ratings' | 'comments' = 'ratings'
+): Promise<ImportSummary> {
+  return apiRequest<ImportSummary>('/api/movies/import', {
+    method: 'POST',
+    body: JSON.stringify({ content, provider, type }),
+  });
+}
+
 export async function importFilmtipset(
   content: string,
   type: 'ratings' | 'comments'
 ): Promise<ImportSummary> {
-  return apiRequest<ImportSummary>('/api/movies/import', {
-    method: 'POST',
-    body: JSON.stringify({ content, type }),
-  });
+  return importMovies(content, 'filmtipset', type);
+}
+
+export async function importTrakt(content: string): Promise<ImportSummary> {
+  return importMovies(content, 'trakt', 'ratings');
 }
 
 export async function importRatings(content: string): Promise<ImportSummary> {

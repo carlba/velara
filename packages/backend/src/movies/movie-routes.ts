@@ -9,7 +9,7 @@ import { createWatchService } from '../watch/watch-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createReviewService } from '../reviews/review-service.js';
 import { createCommentService } from '../comments/comment-service.js';
-import { importFromFilmtipset } from './import-service.js';
+import { importFromFilmtipset, importFromTrakt } from './import-service.js';
 import { USER_FILTER_VALUES } from './movie-types.js';
 import type { SortBy, UserFilterValue } from './movie-types.js';
 
@@ -52,6 +52,7 @@ const deleteCommentParamsSchema = z.object({
 
 const importBodySchema = z.object({
   content: z.string().min(1),
+  provider: z.enum(['filmtipset', 'trakt']).default('filmtipset'),
   type: z.enum(['ratings', 'comments']).default('ratings'),
 });
 
@@ -184,11 +185,16 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     '/import',
     { preHandler: authenticate, schema: { body: importBodySchema } },
     async (request, reply) => {
-      const summary = await importFromFilmtipset(
-        request.user.userId,
-        request.body.content,
-        request.body.type
-      );
+      let summary;
+      if (request.body.provider === 'trakt') {
+        summary = await importFromTrakt(request.user.userId, request.body.content);
+      } else {
+        summary = await importFromFilmtipset(
+          request.user.userId,
+          request.body.content,
+          request.body.type
+        );
+      }
       return reply.send(summary);
     }
   );

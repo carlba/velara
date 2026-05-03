@@ -1,8 +1,23 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import * as importService from './import-service.js';
 import type { parseFilmtipsetCsvRows as ParseFilmtipsetCsvRows } from './import-service.js';
 import { z } from 'zod';
 
 const originalEnv = { ...process.env };
+
+const findMovieByImdbIdMock = vi.fn();
+const upsertRatingMock = vi.fn();
+const createWatchEntryIfMissingMock = vi.fn();
+
+vi.mock('./movie-service.js', () => ({
+  createMovieService: () => ({ findMovieByImdbId: findMovieByImdbIdMock }),
+}));
+vi.mock('../ratings/rating-service.js', () => ({
+  createRatingService: () => ({ upsertRating: upsertRatingMock }),
+}));
+vi.mock('../watch/watch-service.js', () => ({
+  createWatchService: () => ({ createWatchEntryIfMissing: createWatchEntryIfMissingMock }),
+}));
 
 process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
 process.env.TMDB_API_KEY = 'test-tmdb-key';
@@ -33,8 +48,7 @@ let commentRowSchema: z.ZodType<{
   comment: string;
 }>;
 
-beforeAll(async () => {
-  const importService = await import('./import-service.js');
+beforeAll(() => {
   normalizeImdbId = importService.normalizeImdbId;
   parseFilmtipsetCsvRows = importService.parseFilmtipsetCsvRows;
   ratingRowSchema = importService.ratingRowSchema;
@@ -133,5 +147,71 @@ describe('import service helpers', () => {
     ]);
     expect(result.errors).toEqual([]);
     expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('Trakt import service', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
+  it('imports ratings and watch history from a valid Trakt JSON export', async () => {
+    findMovieByImdbIdMock.mockResolvedValue({ success: true, tmdbId: 123 });
+    upsertRatingMock.mockResolvedValue({});
+    createWatchEntryIfMissingMock.mockResolvedValue({});
+
+    const { importFromTrakt } = importService;
+
+    const content = JSON.stringify({
+      ratings: [
+        {
+          rated_at: '2024-05-01T12:00:00Z',
+          rating: 8,
+          type: 'movie',
+          movie: {
+            title: 'Example Movie',
+            year: 2024,
+            ids: { tmdb: 123, imdb: 'tt1234567' },
+          },
+        },
+      ],
+      history: [
+        {
+          id: 1,
+          watched_at: '2024-04-15T20:00:00Z',
+          action: 'watch',
+          type: 'movie',
+          movie: {
+            title: 'Example Movie',
+            year: 2024,
+            ids: { tmdb: 123, imdb: 'tt1234567' },
+          },
+        },
+      ],
+    });
+
+    const summary = await importFromTrakt(1, content);
+
+    expect(summary.importedCount).toBe(2);
+    expect(summary.skippedCount).toBe(0);
+    expect(summary.errors).toEqual([]);
+    expect(upsertRatingMock).toHaveBeenCalledWith(123, 1, 8, expect.any(Date), 'trakt');
+    expect(createWatchEntryIfMissingMock).toHaveBeenCalledWith(
+      123,
+      1,
+      new Date('2024-04-15T20:00:00Z'),
+      'trakt'
+    );
+  });
+
+  it('returns an error summary for invalid Trakt JSON content', async () => {
+    const { importFromTrakt } = importService;
+
+    const summary = await importFromTrakt(1, '{ invalid json');
+
+    expect(summary.importedCount).toBe(0);
+    expect(summary.skippedCount).toBe(0);
+    expect(summary.errors).toEqual(['Invalid JSON content']);
   });
 });

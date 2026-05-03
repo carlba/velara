@@ -40,6 +40,7 @@ model WatchEntry {
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   watchedAt DateTime
+  source    String   @default("manual")
   createdAt DateTime @default(now())
 
   @@unique([tmdbId, userId])
@@ -51,6 +52,8 @@ model Rating {
   userId     Int
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   score      Int
+  source     String   @default("manual")
+  ratedAt    DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   importedAt DateTime?

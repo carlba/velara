@@ -7,6 +7,15 @@ import { createCommentService } from '../comments/comment-service.js';
 import { createMovieService } from './movie-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createWatchService } from '../watch/watch-service.js';
+import type {
+  TraktExport,
+  TraktMovie,
+  TraktRatingEntry,
+  TraktHistoryEntry,
+} from '../trakt.types.js';
+
+const TRAKT_SOURCE = 'trakt';
+const FILMTIPSET_SOURCE = 'filmtipset';
 
 interface ImportLogger {
   error: (...args: unknown[]) => void;
@@ -75,6 +84,9 @@ export type ParsedCsvRow<T> = T & { line: number };
 type ParsedCsvResult<T> =
   | { row: ParsedCsvRow<T>; error?: undefined }
   | { error: string; row?: undefined };
+
+type TraktMovieRatingEntry = Extract<TraktRatingEntry, { type: 'movie' }>;
+type TraktMovieHistoryEntry = Extract<TraktHistoryEntry, { type: 'movie' }>;
 
 function normalizeFilmtipsetCsvRow(rawLine: unknown[]): unknown[] {
   if (rawLine.length === 3 && typeof rawLine[0] === 'string' && rawLine[0].includes(',')) {
@@ -149,6 +161,192 @@ function dedupeRowsByImdbId<T extends { imdbId: string; watchedAt: Date }>(rows:
   return dedupedRows;
 }
 
+function getTraktMovieKey(movie: TraktMovie): string | null {
+  if (typeof movie.ids?.tmdb === 'number') {
+    return `tmdb:${movie.ids.tmdb}`;
+  }
+
+  if (typeof movie.ids?.imdb === 'string' && movie.ids.imdb.trim() !== '') {
+    return `imdb:${movie.ids.imdb}`;
+  }
+
+  return null;
+}
+
+function dedupeTraktRows<T extends { key: string; timestamp: Date }>(rows: T[]) {
+  const dedupedRows = new Map<string, T>();
+  for (const row of rows) {
+    const existing = dedupedRows.get(row.key);
+    if (!existing || row.timestamp > existing.timestamp) {
+      dedupedRows.set(row.key, row);
+    }
+  }
+  return dedupedRows;
+}
+
+async function resolveTraktMovieTmdbId(
+  movie: TraktMovie,
+  movieService: ReturnType<typeof createMovieService>
+): Promise<{ success: true; tmdbId: number } | { success: false; message: string }> {
+  if (typeof movie.ids?.tmdb === 'number') {
+    return { success: true, tmdbId: movie.ids.tmdb };
+  }
+
+  if (typeof movie.ids?.imdb === 'string' && movie.ids.imdb.trim() !== '') {
+    const result = await movieService.findMovieByImdbId(movie.ids.imdb);
+    if (result.success) {
+      return { success: true, tmdbId: result.tmdbId };
+    }
+    return { success: false, message: result.message };
+  }
+
+  return { success: false, message: 'No valid TMDB or IMDb identifiers were available' };
+}
+
+async function importFromTraktExport(
+  userId: number,
+  traktExport: TraktExport,
+  options: ServiceOptions
+): Promise<ImportSummary> {
+  const serviceLogger = options.logger ?? LOGGER;
+  const logger = serviceLogger.child({ module: 'import-service', source: TRAKT_SOURCE });
+  const movieService = createMovieService({ logger });
+  const watchService = createWatchService({ logger });
+  const ratingService = createRatingService({ logger });
+  const importTimestamp = new Date();
+  const errors: string[] = [];
+  let importedCount = 0;
+  let skippedCount = 0;
+
+  const ratingRows = dedupeTraktRows(
+    traktExport.ratings
+      .filter((entry): entry is TraktMovieRatingEntry => entry.type === 'movie')
+      .map(entry => ({
+        key: getTraktMovieKey(entry.movie),
+        movie: entry.movie,
+        score: entry.rating,
+        ratedAt: new Date(entry.rated_at),
+        timestamp: new Date(entry.rated_at),
+      }))
+      .filter(
+        (
+          entry
+        ): entry is {
+          key: string;
+          movie: TraktMovie;
+          score: number;
+          ratedAt: Date;
+          timestamp: Date;
+        } => Boolean(entry.key)
+      )
+  );
+
+  for (const row of ratingRows.values()) {
+    if (Number.isNaN(row.ratedAt.getTime())) {
+      errors.push(`Rating import skipped: invalid rating date for ${row.key}`);
+      skippedCount += 1;
+      continue;
+    }
+
+    const resolved = await resolveTraktMovieTmdbId(row.movie, movieService);
+    if (!resolved.success) {
+      errors.push(`Rating import skipped: ${resolved.message}`);
+      skippedCount += 1;
+      continue;
+    }
+
+    try {
+      await ratingService.upsertRating(
+        resolved.tmdbId,
+        userId,
+        row.score,
+        row.ratedAt,
+        importTimestamp,
+        TRAKT_SOURCE
+      );
+      importedCount += 1;
+    } catch (error) {
+      logger.error({ err: error, row }, 'Failed to import Trakt rating');
+      errors.push('Rating import failed');
+      skippedCount += 1;
+    }
+  }
+
+  const historyRows = dedupeTraktRows(
+    traktExport.history
+      .filter((entry): entry is TraktMovieHistoryEntry => entry.type === 'movie')
+      .map(entry => ({
+        key: getTraktMovieKey(entry.movie),
+        movie: entry.movie,
+        watchedAt: new Date(entry.watched_at),
+        timestamp: new Date(entry.watched_at),
+      }))
+      .filter(
+        (entry): entry is { key: string; movie: TraktMovie; watchedAt: Date; timestamp: Date } =>
+          Boolean(entry.key)
+      )
+  );
+
+  for (const row of historyRows.values()) {
+    if (Number.isNaN(row.watchedAt.getTime())) {
+      errors.push(`Watch import skipped: invalid watch date for ${row.key}`);
+      skippedCount += 1;
+      continue;
+    }
+
+    const resolved = await resolveTraktMovieTmdbId(row.movie, movieService);
+    if (!resolved.success) {
+      errors.push(`Watch import skipped: ${resolved.message}`);
+      skippedCount += 1;
+      continue;
+    }
+
+    try {
+      await watchService.createWatchEntryIfMissing(
+        resolved.tmdbId,
+        userId,
+        row.watchedAt,
+        TRAKT_SOURCE
+      );
+      importedCount += 1;
+    } catch (error) {
+      logger.error({ err: error, row }, 'Failed to import Trakt watch history');
+      errors.push('Watch import failed');
+      skippedCount += 1;
+    }
+  }
+
+  return { importedCount, skippedCount, errors };
+}
+
+export async function importFromTrakt(
+  userId: number,
+  content: string,
+  options?: ServiceOptions
+): Promise<ImportSummary> {
+  const serviceLogger = options?.logger ?? LOGGER;
+  const logger = serviceLogger.child({ module: 'import-service', source: TRAKT_SOURCE });
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to parse Trakt export JSON');
+    return { importedCount: 0, skippedCount: 0, errors: ['Invalid JSON content'] };
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('ratings' in parsed) ||
+    !('history' in parsed)
+  ) {
+    return { importedCount: 0, skippedCount: 0, errors: ['Invalid Trakt export structure'] };
+  }
+
+  return importFromTraktExport(userId, parsed as TraktExport, options ?? {});
+}
+
 export async function importFromFilmtipset(
   userId: number,
   content: string,
@@ -187,8 +385,20 @@ export async function importFromFilmtipset(
           continue;
         }
 
-        await ratingService.upsertRating(lookupResult.tmdbId, userId, row.score, importTimestamp);
-        await watchService.createWatchEntryIfMissing(lookupResult.tmdbId, userId, row.watchedAt);
+        await ratingService.upsertRating(
+          lookupResult.tmdbId,
+          userId,
+          row.score,
+          row.watchedAt,
+          importTimestamp,
+          FILMTIPSET_SOURCE
+        );
+        await watchService.createWatchEntryIfMissing(
+          lookupResult.tmdbId,
+          userId,
+          row.watchedAt,
+          FILMTIPSET_SOURCE
+        );
         importedCount += 1;
       } catch (error) {
         logger.error({ err: error, row }, 'Failed to import rating row');
@@ -226,7 +436,12 @@ export async function importFromFilmtipset(
           row.watchedAt,
           importTimestamp
         );
-        await watchService.createWatchEntryIfMissing(lookupResult.tmdbId, userId, row.watchedAt);
+        await watchService.createWatchEntryIfMissing(
+          lookupResult.tmdbId,
+          userId,
+          row.watchedAt,
+          FILMTIPSET_SOURCE
+        );
         importedCount += 1;
       } catch (error) {
         logger.error({ err: error, row }, 'Failed to import comment row');

@@ -22,19 +22,34 @@ describe('rating service', () => {
     vi.clearAllMocks();
   });
 
-  it('upserts a rating with importedAt on create', async () => {
-    const rating = { id: 1, tmdbId: 123, userId: 5, score: 4, importedAt: new Date() };
+  it('upserts a rating with ratedAt and importedAt on create', async () => {
+    const rating = {
+      id: 1,
+      tmdbId: 123,
+      userId: 5,
+      score: 4,
+      ratedAt: new Date('2024-05-01T12:00:00Z'),
+      importedAt: new Date('2024-06-01T12:00:00Z'),
+    };
     upsertMock.mockResolvedValue(rating);
 
     const { createRatingService } = await import('./rating-service.js');
     const service = createRatingService({ logger: loggerMock });
+    const ratedAt = new Date('2024-05-01T12:00:00Z');
     const importedAt = new Date('2024-06-01T12:00:00Z');
 
-    expect(await service.upsertRating(123, 5, 4, importedAt)).toBe(rating);
+    expect(await service.upsertRating(123, 5, 4, ratedAt, importedAt)).toBe(rating);
     expect(upsertMock).toHaveBeenCalledWith({
       where: { tmdbId_userId: { tmdbId: 123, userId: 5 } },
-      update: { score: 4 },
-      create: { tmdbId: 123, userId: 5, score: 4, importedAt },
+      update: { score: 4, source: 'manual', ratedAt, importedAt },
+      create: {
+        tmdbId: 123,
+        userId: 5,
+        score: 4,
+        source: 'manual',
+        ratedAt,
+        importedAt,
+      },
     });
   });
 
@@ -48,8 +63,8 @@ describe('rating service', () => {
     expect(await service.upsertRating(123, 5, 5)).toBe(rating);
     expect(upsertMock).toHaveBeenCalledWith({
       where: { tmdbId_userId: { tmdbId: 123, userId: 5 } },
-      update: { score: 5 },
-      create: { tmdbId: 123, userId: 5, score: 5 },
+      update: { score: 5, source: 'manual' },
+      create: { tmdbId: 123, userId: 5, score: 5, source: 'manual' },
     });
   });
 

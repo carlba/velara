@@ -16,20 +16,30 @@ export function createWatchService(options?: ServiceOptions) {
     serviceLogger.child({ module: 'watch-service', context });
 
   return {
-    async getOrCreateWatchEntry(tmdbId: number, userId: number, watchedAt: Date) {
+    async getOrCreateWatchEntry(
+      tmdbId: number,
+      userId: number,
+      watchedAt: Date,
+      source = 'manual'
+    ) {
       const logger = localLogger('getOrCreateWatchEntry');
-      logger.debug({ tmdbId, userId, watchedAt }, 'Upserting watch entry');
+      logger.debug({ tmdbId, userId, watchedAt, source }, 'Upserting watch entry');
 
       return prisma.watchEntry.upsert({
         where: { tmdbId_userId: { tmdbId, userId } },
-        update: { watchedAt },
-        create: { tmdbId, userId, watchedAt },
+        update: { watchedAt, source },
+        create: { tmdbId, userId, watchedAt, source },
       });
     },
 
-    async createWatchEntryIfMissing(tmdbId: number, userId: number, watchedAt: Date) {
+    async createWatchEntryIfMissing(
+      tmdbId: number,
+      userId: number,
+      watchedAt: Date,
+      source = 'manual'
+    ) {
       const logger = localLogger('createWatchEntryIfMissing');
-      logger.debug({ tmdbId, userId, watchedAt }, 'Creating watch entry only if missing');
+      logger.debug({ tmdbId, userId, watchedAt, source }, 'Creating watch entry only if missing');
 
       const existing = await prisma.watchEntry.findUnique({
         where: { tmdbId_userId: { tmdbId, userId } },
@@ -38,7 +48,7 @@ export function createWatchService(options?: ServiceOptions) {
       if (existing) return existing;
 
       return prisma.watchEntry.create({
-        data: { tmdbId, userId, watchedAt },
+        data: { tmdbId, userId, watchedAt, source },
       });
     },
 
