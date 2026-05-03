@@ -32,10 +32,9 @@ quality, and nodemon/tsx for development.
 After any change, run these commands in order before considering the task done:
 
 1. Review `README.md` and update it if the change affects documentation or usage.
-2. `npm run lint`
-3. `npm run build`
-4. If you change the Prisma schema, run `cd packages/backend && npm run db:generate` to regenerate
-   the client.
+2. Execute `cd packages/backend && npm run db:generate` to ensure that Prism Schema types are
+   updated.
+3. Run `npm run build` and `npm run lint` to validate code and build.
 
 Fix any failures and rerun both commands before completing the task.
 
