@@ -12,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import ListItemCard from '@/components/lists/ListItemCard';
 import {
   addListItem,
   deleteList,
@@ -22,27 +22,6 @@ import {
   updateList,
 } from '@/services/lists-api';
 import type { AddListItemPayload, ListDetails, ListItemType } from '@/types/list';
-
-const itemLabel = (item: {
-  type: ListItemType;
-  movieTmdbId?: number;
-  seriesTmdbId?: string;
-  seasonNumber?: number;
-  episodeNumber?: number;
-}) => {
-  switch (item.type) {
-    case 'movie':
-      return `Movie #${item.movieTmdbId}`;
-    case 'series':
-      return `Series ${item.seriesTmdbId}`;
-    case 'season':
-      return `Season ${item.seasonNumber} of ${item.seriesTmdbId}`;
-    case 'episode':
-      return `Episode ${item.episodeNumber} of Season ${item.seasonNumber} (${item.seriesTmdbId})`;
-    default:
-      return item.type;
-  }
-};
 
 export default function ListDetailsPage() {
   const { listId } = useParams<{ listId: string }>();
@@ -353,26 +332,19 @@ export default function ListDetailsPage() {
               {list.items.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No items have been added yet.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {list.items.map(item => (
-                    <div
-                      key={item.id}
-                      className="flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="space-y-1">
-                        <p className="font-medium">{itemLabel(item)}</p>
-                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          <Badge variant="secondary">{item.type}</Badge>
-                          {item.movieTmdbId ? <span>TMDB #{item.movieTmdbId}</span> : null}
-                          {item.seriesTmdbId ? <span>{item.seriesTmdbId}</span> : null}
-                        </div>
-                      </div>
+                    <div key={item.id} className="space-y-2">
+                      <ListItemCard item={item} />
                       {isOwner ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteItem(item.id)}>
-                          Remove
-                        </Button>
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteItem(item.id)}>
+                            Remove
+                          </Button>
+                        </div>
                       ) : null}
                     </div>
                   ))}
