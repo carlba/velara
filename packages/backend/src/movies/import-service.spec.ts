@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { parseFilmtipsetCsvRows as ParseFilmtipsetCsvRows } from './import-service.js';
+import { z } from 'zod';
 
 const originalEnv = { ...process.env };
 
@@ -7,41 +9,36 @@ process.env.TMDB_API_KEY = 'test-tmdb-key';
 process.env.OMDB_API_KEY = 'test-omdb-key';
 process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-chars!!';
 
-interface ParsedRow {
+interface RatingRow {
   imdbId: string;
   score: number;
   watchedAt: Date;
   title: string;
-  line: number;
 }
 
-interface ParsedCommentRow {
+interface CommentRow {
   imdbId: string;
   watchedAt: Date;
   title: string;
   comment: string;
-  line: number;
 }
 
 let normalizeImdbId: (value: string) => string | null;
-let parseFilmtipsetRows: (
-  content: string,
-  logger: ImportLogger
-) => { rows: ParsedRow[]; errors: string[] };
-let parseFilmtipsetCommentRows: (
-  content: string,
-  logger: ImportLogger
-) => { rows: ParsedCommentRow[]; errors: string[] };
-
-interface ImportLogger {
-  error: (...args: unknown[]) => void;
-}
+let parseFilmtipsetCsvRows: typeof ParseFilmtipsetCsvRows;
+let ratingRowSchema: z.ZodType<{ imdbId: string; score: number; watchedAt: Date; title: string }>;
+let commentRowSchema: z.ZodType<{
+  imdbId: string;
+  watchedAt: Date;
+  title: string;
+  comment: string;
+}>;
 
 beforeAll(async () => {
   const importService = await import('./import-service.js');
   normalizeImdbId = importService.normalizeImdbId;
-  parseFilmtipsetRows = importService.parseFilmtipsetRows;
-  parseFilmtipsetCommentRows = importService.parseFilmtipsetCommentRows;
+  parseFilmtipsetCsvRows = importService.parseFilmtipsetCsvRows;
+  ratingRowSchema = importService.ratingRowSchema;
+  commentRowSchema = importService.commentRowSchema;
 });
 
 afterAll(() => {
@@ -71,11 +68,22 @@ describe('import service helpers', () => {
     const logger = { error: vi.fn() };
     const content = '2024-01-01;Example Movie;455;5';
 
-    const result = parseFilmtipsetRows(content, logger);
+    const result = parseFilmtipsetCsvRows<RatingRow>(content, logger, ratingRowSchema, [
+      'votedate',
+      'movietitle',
+      'imdb',
+      'score',
+    ]);
 
     expect(result.rows).toEqual([]);
-    expect(result.errors).toEqual(['Line 1: invalid IMDB id']);
-    expect(logger.error).toHaveBeenCalledWith({ line: 1, rawImdb: '455' }, 'Invalid IMDB id value');
+    expect(result.errors).toEqual([
+      'Line 1: [{"origin":"string","code":"invalid_format","format":"regex","pattern":"/^[0-9]{4,7}$/","path":[2],"message":"invalid IMDB id"}]',
+    ]);
+    expect(logger.error).toHaveBeenCalledWith(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      { line: 1, rawImdb: '455', issues: expect.any(Array) },
+      'Row validation failed'
+    );
   });
 
   it('parses Filmtipset comment rows with a header', () => {
@@ -83,7 +91,12 @@ describe('import service helpers', () => {
     const content =
       'Date;Movie;IMDB;Text\n2018-05-20;Captain Fantastic - En annorlunda pappa;3553976;"Tänkvärd film"';
 
-    const result = parseFilmtipsetCommentRows(content, logger);
+    const result = parseFilmtipsetCsvRows<CommentRow>(content, logger, commentRowSchema, [
+      'date',
+      'movie',
+      'imdb',
+      'text',
+    ]);
 
     expect(result.rows).toEqual([
       {
@@ -91,6 +104,30 @@ describe('import service helpers', () => {
         title: 'Captain Fantastic - En annorlunda pappa',
         watchedAt: new Date('2018-05-20'),
         comment: 'Tänkvärd film',
+        line: 2,
+      },
+    ]);
+    expect(result.errors).toEqual([]);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('parses Filmtipset rating rows when date and title are comma-separated', () => {
+    const logger = { error: vi.fn() };
+    const content = 'VoteDate;MovieTitle;IMDB;Score\n2021-07-03,1917;8579674;3';
+
+    const result = parseFilmtipsetCsvRows<RatingRow>(content, logger, ratingRowSchema, [
+      'votedate',
+      'movietitle',
+      'imdb',
+      'score',
+    ]);
+
+    expect(result.rows).toEqual([
+      {
+        imdbId: 'tt8579674',
+        title: '1917',
+        watchedAt: new Date('2021-07-03'),
+        score: 3,
         line: 2,
       },
     ]);

@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { parse } from 'csv-parse/sync';
+import { z } from 'zod';
 import { LOGGER } from '../registry.js';
 import { createCommentService } from '../comments/comment-service.js';
 import { createMovieService } from './movie-service.js';
@@ -23,22 +24,6 @@ export interface ImportSummary {
 
 export type FilmtipsetImportType = 'ratings' | 'comments';
 
-interface ParsedRatingRow {
-  imdbId: string;
-  score: number;
-  watchedAt: Date;
-  title: string;
-  line: number;
-}
-
-interface ParsedCommentRow {
-  imdbId: string;
-  watchedAt: Date;
-  title: string;
-  comment: string;
-  line: number;
-}
-
 export function normalizeImdbId(value: string): string | null {
   const normalized = value.trim();
 
@@ -49,87 +34,65 @@ export function normalizeImdbId(value: string): string | null {
   return `tt${normalized.padStart(7, '0')}`;
 }
 
-export function parseFilmtipsetRows(
-  content: string,
-  logger: ImportLogger
-): { rows: ParsedRatingRow[]; errors: string[] } {
-  const records = parse(content, {
-    delimiter: ';',
-    trim: true,
-    skip_empty_lines: true,
-    relax_column_count: true,
-  });
+const imdbIdSchema = z
+  .string()
+  .regex(/^[0-9]{4,7}$/, 'invalid IMDB id')
+  .transform(value => `tt${value.padStart(7, '0')}`);
 
-  if (records.length === 0) {
-    return { rows: [], errors: ['File content is empty'] };
+export const ratingRowSchema = z
+  .tuple([
+    z.coerce.date(),
+    z.string().min(1, 'title is required'),
+    imdbIdSchema,
+    z
+      .string()
+      .regex(/^[1-5]$/, 'score must be an integer between 1 and 5')
+      .transform(value => Number(value)),
+  ])
+  .transform(([watchedAt, title, imdbId, score]) => ({
+    imdbId,
+    score,
+    watchedAt,
+    title,
+  }));
+
+export const commentRowSchema = z
+  .tuple([
+    z.coerce.date(),
+    z.string().min(1, 'title is required'),
+    imdbIdSchema,
+    z.string().min(1, 'comment text is required'),
+  ])
+  .transform(([watchedAt, title, imdbId, comment]) => ({
+    imdbId,
+    watchedAt,
+    title,
+    comment,
+  }));
+
+export type ParsedCsvRow<T> = T & { line: number };
+
+type ParsedCsvResult<T> =
+  | { row: ParsedCsvRow<T>; error?: undefined }
+  | { error: string; row?: undefined };
+
+function normalizeFilmtipsetCsvRow(rawLine: unknown[]): unknown[] {
+  if (rawLine.length === 3 && typeof rawLine[0] === 'string' && rawLine[0].includes(',')) {
+    const [date, title] = rawLine[0].split(',', 2).map(part => part.trim());
+    if (date && title) {
+      return [date, title, rawLine[1], rawLine[2]];
+    }
   }
 
-  const errors: string[] = [];
-  const rows: ParsedRatingRow[] = [];
-  const header = records[0].map(column => String(column).toLowerCase());
-  const hasHeader =
-    header.includes('votedate') &&
-    header.includes('movietitle') &&
-    header.includes('imdb') &&
-    header.includes('score');
-
-  const startIndex = hasHeader ? 1 : 0;
-
-  for (let index = startIndex; index < records.length; index += 1) {
-    const rawLine = records[index];
-    const lineNumber = index + 1;
-
-    if (rawLine.length < 3 || rawLine.length > 4) {
-      errors.push(`Line ${lineNumber}: expected 3 or 4 columns, got ${rawLine.length}`);
-      continue;
-    }
-
-    let rawDate: string;
-    let title: string;
-    let imdbRaw: string;
-    let scoreRaw: string;
-
-    if (rawLine.length === 4) {
-      [rawDate, title, imdbRaw, scoreRaw] = rawLine;
-    } else {
-      const [dateAndTitle, imdb, score] = rawLine;
-      const [date, ...titleParts] = dateAndTitle.split(',');
-      rawDate = date?.trim() ?? '';
-      title = titleParts.join(',').trim();
-      imdbRaw = imdb;
-      scoreRaw = score;
-    }
-
-    const imdbId = normalizeImdbId(imdbRaw);
-    const score = Number(scoreRaw);
-    const watchedAt = new Date(rawDate);
-
-    if (!imdbId) {
-      logger.error({ line: lineNumber, rawImdb: imdbRaw }, 'Invalid IMDB id value');
-      errors.push(`Line ${lineNumber}: invalid IMDB id`);
-      continue;
-    }
-
-    if (!Number.isInteger(score) || score < 1 || score > 5) {
-      errors.push(`Line ${lineNumber}: score must be an integer between 1 and 5`);
-      continue;
-    }
-
-    if (Number.isNaN(watchedAt.getTime())) {
-      errors.push(`Line ${lineNumber}: invalid VoteDate`);
-      continue;
-    }
-
-    rows.push({ imdbId, score, watchedAt, title, line: lineNumber });
-  }
-
-  return { rows, errors };
+  return rawLine;
 }
 
-export function parseFilmtipsetCommentRows(
+export function parseFilmtipsetCsvRows<T>(
   content: string,
-  logger: ImportLogger
-): { rows: ParsedCommentRow[]; errors: string[] } {
+  logger: ImportLogger,
+  rowSchema: z.ZodType<T>,
+  requiredHeaders: string[]
+): { rows: ParsedCsvRow<T>[]; errors: string[] } {
   const records = parse(content, {
     delimiter: ';',
     trim: true,
@@ -141,51 +104,38 @@ export function parseFilmtipsetCommentRows(
     return { rows: [], errors: ['File content is empty'] };
   }
 
-  const errors: string[] = [];
-  const rows: ParsedCommentRow[] = [];
   const header = records[0].map(column => String(column).toLowerCase());
-  const hasHeader =
-    header.includes('date') &&
-    header.includes('movie') &&
-    header.includes('imdb') &&
-    header.includes('text');
-
+  const hasHeader = requiredHeaders.every(label => header.includes(label));
   const startIndex = hasHeader ? 1 : 0;
 
-  for (let index = startIndex; index < records.length; index += 1) {
-    const rawLine = records[index];
-    const lineNumber = index + 1;
+  const results = records.slice(startIndex).map((rawLine, rowIndex): ParsedCsvResult<T> => {
+    const lineNumber = startIndex + rowIndex + 1;
+    const rawImdb = rawLine[2];
+    const normalizedLine = normalizeFilmtipsetCsvRow(rawLine);
+    const result = rowSchema.safeParse(normalizedLine);
 
-    if (rawLine.length !== 4) {
-      errors.push(`Line ${lineNumber}: expected 4 columns, got ${rawLine.length}`);
-      continue;
+    if (!result.success) {
+      logger.error(
+        { line: lineNumber, rawImdb, issues: result.error.issues },
+        'Row validation failed'
+      );
+
+      return {
+        error: `Line ${lineNumber}: ${JSON.stringify(result.error.issues)}`,
+      };
     }
 
-    const [rawDate, title, imdbRaw, commentRaw] = rawLine;
-    const imdbId = normalizeImdbId(imdbRaw);
-    const watchedAt = new Date(rawDate);
-    const comment = String(commentRaw ?? '').trim();
+    return { row: { ...result.data, line: lineNumber } };
+  });
 
-    if (!imdbId) {
-      logger.error({ line: lineNumber, rawImdb: imdbRaw }, 'Invalid IMDB id value');
-      errors.push(`Line ${lineNumber}: invalid IMDB id`);
-      continue;
-    }
-
-    if (Number.isNaN(watchedAt.getTime())) {
-      errors.push(`Line ${lineNumber}: invalid Date`);
-      continue;
-    }
-
-    if (!comment) {
-      errors.push(`Line ${lineNumber}: comment text is required`);
-      continue;
-    }
-
-    rows.push({ imdbId, watchedAt, title, comment, line: lineNumber });
-  }
-
-  return { rows, errors };
+  return {
+    rows: results
+      .filter((result): result is { row: ParsedCsvRow<T> } => result.row !== undefined)
+      .map(result => result.row),
+    errors: results
+      .filter((result): result is { error: string } => result.error !== undefined)
+      .map(result => result.error),
+  };
 }
 
 function dedupeRowsByImdbId<T extends { imdbId: string; watchedAt: Date }>(rows: T[]) {
@@ -215,7 +165,12 @@ export async function importFromFilmtipset(
   let skippedCount = 0;
 
   if (type === 'ratings') {
-    const parseResult = parseFilmtipsetRows(content, logger);
+    const parseResult = parseFilmtipsetCsvRows(content, logger, ratingRowSchema, [
+      'votedate',
+      'movietitle',
+      'imdb',
+      'score',
+    ]);
     errors.push(...parseResult.errors);
     skippedCount += parseResult.errors.length;
     const dedupedRows = dedupeRowsByImdbId(parseResult.rows);
@@ -242,7 +197,12 @@ export async function importFromFilmtipset(
       }
     }
   } else {
-    const parseResult = parseFilmtipsetCommentRows(content, logger);
+    const parseResult = parseFilmtipsetCsvRows(content, logger, commentRowSchema, [
+      'date',
+      'movie',
+      'imdb',
+      'text',
+    ]);
     errors.push(...parseResult.errors);
     skippedCount += parseResult.errors.length;
     const dedupedRows = dedupeRowsByImdbId(parseResult.rows);
