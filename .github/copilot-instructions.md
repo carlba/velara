@@ -165,6 +165,7 @@ async function fetchUser(userId: string): Promise<User> {
 ## Frontend & Web UI
 
 - Use React with TypeScript as the standard for all web UI work.
+
 - Use [shadcn/ui](https://ui.shadcn.com) as the primary component library; add components via
   `npx shadcn@latest add <component>` and own the generated source in `src/components/ui/`.
 - Use Tailwind CSS utility classes for all styling; avoid plain CSS files unless Tailwind cannot
@@ -178,6 +179,7 @@ async function fetchUser(userId: string): Promise<User> {
 - Keep components small and focused on a single responsibility; move business logic into custom
   hooks or service modules.
 - Use React Router for client-side routing when navigation is required.
+  - If query params are utilized use the hook https://reactrouter.com/api/hooks/useSearchParams
 - Prefer functional components and React hooks; do not use class components.
 - Lift state only as far as needed; prefer local component state or context over global state
   libraries unless the app clearly requires it.

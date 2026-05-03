@@ -1,20 +1,30 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MovieSearch from '@/components/movies/MovieSearch';
 import MovieGrid from '@/components/movies/MovieGrid';
 import { useMovies } from '@/hooks/useMovies';
 import { useAuth } from '@/hooks/useAuth';
+import { buildUrlSearchParams, parseUrlFilterParam, parseUrlSortParam } from '@/lib/query-params';
 import type { SortBy, UserFilter } from '@/types/movie';
 
 const DEBOUNCE_MS = 400;
+const DEFAULT_MOVIE_SORT: SortBy = 'popularity';
+const ALLOWED_MOVIE_FILTERS = ['rated', 'watched', 'reviewed', 'commented'] as const;
+const ALLOWED_MOVIE_SORTS = ['popularity', 'rating', 'watched_date', 'my_rating'] as const;
 
 export default function MoviesPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState<SortBy>('popularity');
-  const [userFilters, setUserFilters] = useState<UserFilter[]>([]);
+  const [sortBy, setSortBy] = useState<SortBy>(() =>
+    parseUrlSortParam(searchParams, 'sort', ALLOWED_MOVIE_SORTS, DEFAULT_MOVIE_SORT)
+  );
+  const [userFilters, setUserFilters] = useState<UserFilter[]>(() =>
+    parseUrlFilterParam(searchParams, 'filter', ALLOWED_MOVIE_FILTERS)
+  );
   const [page, setPage] = useState(1);
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,21 +54,66 @@ export default function MoviesPage() {
     [debounceTimer]
   );
 
+  useEffect(() => {
+    const nextSortBy = parseUrlSortParam(
+      searchParams,
+      'sort',
+      ALLOWED_MOVIE_SORTS,
+      DEFAULT_MOVIE_SORT
+    );
+    const nextUserFilters = parseUrlFilterParam(searchParams, 'filter', ALLOWED_MOVIE_FILTERS);
+
+    if (nextSortBy !== sortBy) {
+      setSortBy(nextSortBy);
+    }
+
+    if (
+      nextUserFilters.length !== userFilters.length ||
+      nextUserFilters.some((value, index) => userFilters[index] !== value)
+    ) {
+      setUserFilters(nextUserFilters);
+    }
+  }, [searchParams, sortBy, userFilters]);
+
   const handleSortChange = (sort: SortBy) => {
     setSortBy(sort);
     setPage(1);
+    setSearchParams(
+      buildUrlSearchParams(searchParams, 'filter', 'sort', userFilters, sort, DEFAULT_MOVIE_SORT),
+      { replace: true }
+    );
   };
 
   const handleFilterChange = (filter: UserFilter) => {
     const isRemoving = userFilters.includes(filter);
-    setUserFilters(currentFilters =>
-      isRemoving ? currentFilters.filter(f => f !== filter) : [...currentFilters, filter]
-    );
+    const nextFilters = isRemoving
+      ? userFilters.filter(f => f !== filter)
+      : [...userFilters, filter];
+
+    let nextSortBy = sortBy;
     if (isRemoving) {
-      if (filter === 'watched' && sortBy === 'watched_date') setSortBy('popularity');
-      if (filter === 'rated' && sortBy === 'my_rating') setSortBy('popularity');
+      if (filter === 'watched' && sortBy === 'watched_date') {
+        nextSortBy = DEFAULT_MOVIE_SORT;
+      }
+      if (filter === 'rated' && sortBy === 'my_rating') {
+        nextSortBy = DEFAULT_MOVIE_SORT;
+      }
     }
+
+    setUserFilters(nextFilters);
+    setSortBy(nextSortBy);
     setPage(1);
+    setSearchParams(
+      buildUrlSearchParams(
+        searchParams,
+        'filter',
+        'sort',
+        nextFilters,
+        nextSortBy,
+        DEFAULT_MOVIE_SORT
+      ),
+      { replace: true }
+    );
   };
 
   const totalPages = data?.total_pages ?? 1;
