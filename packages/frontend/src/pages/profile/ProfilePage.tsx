@@ -1,4 +1,4 @@
-import { type ChangeEvent, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,12 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  deleteFlexgetIntegration,
+  fetchFlexgetIntegration,
+  saveFlexgetIntegration,
+  type FlexgetIntegration,
+} from '@/services/flexget-api';
 import { importMovies, type ImportProvider, type ImportSummary } from '@/services/user-data-api';
 import { importTvShows } from '@/services/user-tv-data-api';
 
@@ -25,6 +31,13 @@ export default function ProfilePage() {
   const [importType, setImportType] = useState<'ratings' | 'comments'>('ratings');
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [currentIntegration, setCurrentIntegration] = useState<FlexgetIntegration | null>(null);
+  const [baseUrl, setBaseUrl] = useState('');
+  const [flexgetUsername, setFlexgetUsername] = useState('');
+  const [flexgetPassword, setFlexgetPassword] = useState('');
+  const [isIntegrationLoading, setIsIntegrationLoading] = useState(true);
+  const [isSavingIntegration, setIsSavingIntegration] = useState(false);
+  const [isRemovingIntegration, setIsRemovingIntegration] = useState(false);
 
   const tvFileInputRef = useRef<HTMLInputElement | null>(null);
   const [tvContent, setTvContent] = useState('');
@@ -111,6 +124,64 @@ export default function ProfilePage() {
       toast.error('Import failed. Check the file format and try again.');
     } finally {
       setTvIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    setIsIntegrationLoading(true);
+    fetchFlexgetIntegration()
+      .then(data => {
+        setCurrentIntegration(data);
+        setBaseUrl(data.baseUrl);
+        setFlexgetUsername(data.username);
+      })
+      .catch(() => {
+        setCurrentIntegration(null);
+      })
+      .finally(() => {
+        setIsIntegrationLoading(false);
+      });
+  }, [user]);
+
+  const handleSaveIntegration = async () => {
+    setIsSavingIntegration(true);
+    try {
+      const saved = await saveFlexgetIntegration({
+        baseUrl: baseUrl.trim(),
+        username: flexgetUsername.trim(),
+        password: flexgetPassword,
+      });
+      setCurrentIntegration(saved);
+      setFlexgetPassword('');
+      toast.success('Flexget integration saved.');
+    } catch {
+      toast.error('Unable to save Flexget integration.');
+    } finally {
+      setIsSavingIntegration(false);
+    }
+  };
+
+  const handleRemoveIntegration = async () => {
+    if (!window.confirm('Remove saved Flexget integration?')) {
+      return;
+    }
+
+    setIsRemovingIntegration(true);
+    try {
+      await deleteFlexgetIntegration();
+      setCurrentIntegration(null);
+      setBaseUrl('');
+      setFlexgetUsername('');
+      setFlexgetPassword('');
+      toast.success('Flexget integration removed.');
+    } catch {
+      toast.error('Unable to remove Flexget integration.');
+    } finally {
+      setIsRemovingIntegration(false);
     }
   };
 
@@ -294,6 +365,75 @@ export default function ProfilePage() {
               )}
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Flexget integration</CardTitle>
+          <CardDescription>
+            Save your Flexget host and credentials here so this account can connect lists to a
+            Flexget entry list.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="flexget-base-url">Flexget URL</Label>
+            <Input
+              id="flexget-base-url"
+              type="url"
+              value={baseUrl}
+              onChange={event => setBaseUrl(event.target.value)}
+              placeholder="https://flexget.local"
+              disabled={isIntegrationLoading}
+            />
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="flexget-username">Username</Label>
+              <Input
+                id="flexget-username"
+                value={flexgetUsername}
+                onChange={event => setFlexgetUsername(event.target.value)}
+                disabled={isIntegrationLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="flexget-password">Password</Label>
+              <Input
+                id="flexget-password"
+                type="password"
+                value={flexgetPassword}
+                onChange={event => setFlexgetPassword(event.target.value)}
+                disabled={isIntegrationLoading}
+              />
+            </div>
+          </div>
+
+          {currentIntegration ? (
+            <div className="rounded-lg border border-muted p-4">
+              <p className="text-sm text-muted-foreground">Saved integration</p>
+              <p className="font-medium">{currentIntegration.baseUrl}</p>
+              <p className="text-sm">Username: {currentIntegration.username}</p>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={handleSaveIntegration}
+              disabled={isSavingIntegration || isIntegrationLoading}>
+              {currentIntegration ? 'Update integration' : 'Save integration'}
+            </Button>
+            {currentIntegration ? (
+              <Button
+                variant="destructive"
+                onClick={handleRemoveIntegration}
+                disabled={isRemovingIntegration || isIntegrationLoading}>
+                Remove integration
+              </Button>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -25,6 +25,7 @@ model User {
   tvReviews      TvReview[]
   tvComments     TvComment[]
   lists          List[]
+  flexgetIntegration FlexgetIntegration?
 }
 
 model Review {
@@ -135,14 +136,15 @@ model TvComment {
 }
 
 model List {
-  id          Int        @id @default(autoincrement())
-  title       String
-  description String?
-  creatorId   Int
-  creator     User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  items       ListItem[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id                 Int             @id @default(autoincrement())
+  title              String
+  description        String?
+  creatorId          Int
+  creator            User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  items              ListItem[]
+  flexgetConnection  ListIntegration?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 }
 
 model ListItem {
@@ -156,6 +158,27 @@ model ListItem {
   episodeNumber Int?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+}
+
+model FlexgetIntegration {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int      @unique
+  baseUrl   String
+  username  String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ListIntegration {
+  id            Int      @id @default(autoincrement())
+  list          List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId        Int      @unique
+  entryListName String
+  remoteListId  Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 enum ListItemType {
