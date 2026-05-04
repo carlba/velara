@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Trash2, Plus, Edit3 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,8 +17,10 @@ import { useAuth } from '@/hooks/useAuth';
 import ListItemCard from '@/components/lists/ListItemCard';
 import {
   addListItem,
+  connectListToFlexget,
   deleteList,
   deleteListItem,
+  disconnectListFromFlexget,
   fetchListDetails,
   updateList,
 } from '@/services/lists-api';
@@ -39,6 +42,9 @@ export default function ListDetailsPage() {
   const [seriesTmdbId, setSeriesTmdbId] = useState('');
   const [seasonNumber, setSeasonNumber] = useState('');
   const [episodeNumber, setEpisodeNumber] = useState('');
+  const [entryListName, setEntryListName] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const isOwner = Boolean(user && list && user.id === list.creator.id);
 
@@ -53,6 +59,7 @@ export default function ListDetailsPage() {
         setList(data);
         setTitle(data.title);
         setDescription(data.description ?? '');
+        setEntryListName(data.flexgetConnection?.entryListName ?? '');
       })
       .catch(() => setError('Unable to load list.'))
       .finally(() => setIsLoading(false));
@@ -131,6 +138,48 @@ export default function ListDetailsPage() {
       );
     } catch {
       setError('Could not remove item.');
+    }
+  };
+
+  const handleConnectToFlexget = async () => {
+    if (!list) return;
+    if (!entryListName.trim()) {
+      setError('Entry list name is required to connect.');
+      return;
+    }
+
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      await connectListToFlexget(list.id, entryListName.trim());
+      const updated = await fetchListDetails(list.id);
+      setList(updated);
+      toast.success('List connected to Flexget entry list.');
+    } catch {
+      setError('Could not connect list to Flexget. Check integration settings.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnectFromFlexget = async () => {
+    if (!list || !list.flexgetConnection) return;
+    if (!window.confirm('Disconnect this list from Flexget?')) return;
+
+    setIsDisconnecting(true);
+    setError(null);
+
+    try {
+      await disconnectListFromFlexget(list.id);
+      const updated = await fetchListDetails(list.id);
+      setList(updated);
+      setEntryListName('');
+      toast.success('List disconnected from Flexget.');
+    } catch {
+      setError('Could not disconnect list from Flexget.');
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -318,6 +367,66 @@ export default function ListDetailsPage() {
                   </Button>
                 </div>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Flexget connection</CardTitle>
+              <CardDescription>
+                Connect this list to a Flexget entry list so new items are pushed automatically.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {list.flexgetConnection ? (
+                <div className="rounded-lg border border-muted p-4">
+                  <p className="text-sm text-muted-foreground">Connected entry list</p>
+                  <p className="font-medium">{list.flexgetConnection.entryListName}</p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-muted p-4">
+                  <p className="text-sm text-muted-foreground">
+                    This list is not connected to a Flexget entry list.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="entry-list-name">
+                  Flexget entry list name
+                </label>
+                <Input
+                  id="entry-list-name"
+                  value={entryListName}
+                  onChange={event => setEntryListName(event.target.value)}
+                  placeholder="Example: My Downloads"
+                  disabled={!isOwner}
+                />
+              </div>
+
+              {!isOwner ? (
+                <p className="text-sm text-muted-foreground">
+                  Only the list owner can connect this list to Flexget.
+                </p>
+              ) : null}
+
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={handleConnectToFlexget} disabled={!isOwner || isConnecting}>
+                  {isConnecting
+                    ? 'Connecting…'
+                    : list.flexgetConnection
+                      ? 'Update connection'
+                      : 'Connect list'}
+                </Button>
+                {list.flexgetConnection ? (
+                  <Button
+                    variant="destructive"
+                    onClick={handleDisconnectFromFlexget}
+                    disabled={!isOwner || isDisconnecting}>
+                    {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                  </Button>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
 

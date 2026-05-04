@@ -52,3 +52,19 @@ export async function deleteListItem(listId: number, itemId: number): Promise<vo
     method: 'DELETE',
   });
 }
+
+export async function connectListToFlexget(
+  listId: number,
+  entryListName: string
+): Promise<{ entryListName: string; remoteListId: number }> {
+  return apiRequest(`/api/lists/${listId}/flexget`, {
+    method: 'PUT',
+    body: JSON.stringify({ entryListName }),
+  });
+}
+
+export async function disconnectListFromFlexget(listId: number): Promise<void> {
+  return apiRequest<void>(`/api/lists/${listId}/flexget`, {
+    method: 'DELETE',
+  });
+}

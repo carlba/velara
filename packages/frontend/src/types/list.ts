@@ -24,8 +24,14 @@ export interface ListItem {
   updatedAt: string;
 }
 
+export interface ListFlexgetConnection {
+  entryListName: string;
+  remoteListId: number;
+}
+
 export interface ListDetails extends ListSummary {
   items: ListItem[];
+  flexgetConnection?: ListFlexgetConnection | null;
 }
 
 export interface CreateListPayload {

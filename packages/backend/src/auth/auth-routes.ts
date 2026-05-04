@@ -30,7 +30,7 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
     reply.setCookie('velara_token', token, {
       httpOnly: true,
       path: '/',
-      sameSite: 'lax',
+      sameSite: 'none',
       secure: !config.isDevelopment,
       maxAge: COOKIE_MAX_AGE_SECONDS,
     });
@@ -54,7 +54,7 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
     reply.setCookie('velara_token', token, {
       httpOnly: true,
       path: '/',
-      sameSite: 'lax',
+      sameSite: 'none',
       secure: !config.isDevelopment,
       maxAge: COOKIE_MAX_AGE_SECONDS,
     });
@@ -63,7 +63,11 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
   });
 
   fastify.post('/logout', async (_request, reply) => {
-    reply.clearCookie('velara_token', { path: '/' });
+    reply.clearCookie('velara_token', {
+      path: '/',
+      sameSite: 'none',
+      secure: !config.isDevelopment,
+    });
     return reply.send({ success: true });
   });
 

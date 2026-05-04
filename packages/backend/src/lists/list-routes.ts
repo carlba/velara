@@ -36,6 +36,10 @@ const listItemBodySchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+const flexgetConnectionBodySchema = z.object({
+  entryListName: z.string().min(1).max(100),
+});
+
 export const listRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
   fastify.get('/', { schema: { querystring: listQuerySchema } }, async (request, reply) => {
     const listService = createListService({ logger: request.log });
@@ -133,6 +137,49 @@ export const listRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
       const { listId, itemId } = request.params;
       const listService = createListService({ logger: request.log });
       await listService.deleteItem(listId, itemId, request.user.userId);
+      return reply.code(204).send();
+    }
+  );
+
+  fastify.get(
+    '/:listId/flexget',
+    { preHandler: authenticate, schema: { params: paramsSchema } },
+    async (request, reply) => {
+      const listService = createListService({ logger: request.log });
+      const connection = await listService.getListFlexgetConnection(
+        request.params.listId,
+        request.user.userId
+      );
+      if (!connection) {
+        return reply.code(404).send({ error: 'Flexget connection not found' });
+      }
+      return reply.send(connection);
+    }
+  );
+
+  fastify.put(
+    '/:listId/flexget',
+    {
+      preHandler: authenticate,
+      schema: { params: paramsSchema, body: flexgetConnectionBodySchema },
+    },
+    async (request, reply) => {
+      const listService = createListService({ logger: request.log });
+      const connection = await listService.connectListToFlexget(
+        request.params.listId,
+        request.body.entryListName,
+        request.user.userId
+      );
+      return reply.send(connection);
+    }
+  );
+
+  fastify.delete(
+    '/:listId/flexget',
+    { preHandler: authenticate, schema: { params: paramsSchema } },
+    async (request, reply) => {
+      const listService = createListService({ logger: request.log });
+      await listService.disconnectListFromFlexget(request.params.listId, request.user.userId);
       return reply.code(204).send();
     }
   );
