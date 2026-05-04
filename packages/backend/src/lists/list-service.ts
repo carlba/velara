@@ -3,6 +3,8 @@ import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
 import { HttpError } from '../lib/http-error.js';
+import { tmdbClient } from '../movies/tmdb-client.js';
+import { createFlexgetService } from '../flexget/flexget-service.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -21,8 +23,18 @@ type ListItemInput =
       episodeNumber: number;
     };
 
+interface OwnedListWithConnection {
+  id: number;
+  creatorId: number;
+  flexgetConnection: {
+    entryListName: string;
+    remoteListId: number;
+  } | null;
+}
+
 export function createListService(options?: ServiceOptions) {
   const serviceLogger = options?.logger ?? LOGGER;
+  const flexgetService = createFlexgetService({ logger: serviceLogger });
 
   const localLogger = (context: string) => serviceLogger.child({ module: 'list-service', context });
 
@@ -30,9 +42,13 @@ export function createListService(options?: ServiceOptions) {
     const logger = localLogger('ensureOwnedList');
     logger.debug({ listId, userId }, 'Checking list ownership');
 
-    const list = await prisma.list.findUnique({
+    const list: OwnedListWithConnection | null = await prisma.list.findUnique({
       where: { id: listId },
-      select: { id: true, creatorId: true },
+      select: {
+        id: true,
+        creatorId: true,
+        flexgetConnection: { select: { entryListName: true, remoteListId: true } },
+      },
     });
 
     if (list?.creatorId !== userId) {
@@ -40,6 +56,96 @@ export function createListService(options?: ServiceOptions) {
     }
 
     return list;
+  }
+
+  async function fetchMovieMetadata(movieTmdbId: number) {
+    try {
+      return await tmdbClient
+        .get(`movie/${movieTmdbId}`, {
+          searchParams: { append_to_response: 'external_ids' },
+        })
+        .json<{
+          title: string;
+          original_title?: string;
+          external_ids?: { imdb_id?: string | null };
+        }>();
+    } catch {
+      return {
+        title: `Movie ${movieTmdbId}`,
+        original_title: `Movie ${movieTmdbId}`,
+        external_ids: { imdb_id: null },
+      };
+    }
+  }
+
+  async function fetchTvShowMetadata(seriesTmdbId: string) {
+    try {
+      return await tmdbClient
+        .get(`tv/${seriesTmdbId}`, {
+          searchParams: { append_to_response: 'external_ids' },
+        })
+        .json<{
+          name: string;
+          external_ids?: { imdb_id?: string | null; tvdb_id?: number | null };
+        }>();
+    } catch {
+      return {
+        name: `TV show ${seriesTmdbId}`,
+        external_ids: { imdb_id: null, tvdb_id: null },
+      };
+    }
+  }
+
+  async function mapItemToFlexgetEntry(item: ListItemInput) {
+    switch (item.type) {
+      case 'movie': {
+        const movie = await fetchMovieMetadata(item.movieTmdbId);
+        return {
+          title: movie.title,
+          original_title: movie.original_title ?? movie.title,
+          original_url: `https://www.themoviedb.org/movie/${item.movieTmdbId}`,
+          imdb_id: movie.external_ids?.imdb_id ?? undefined,
+        };
+      }
+      case 'series': {
+        const show = await fetchTvShowMetadata(item.seriesTmdbId);
+        return {
+          title: show.name,
+          original_title: show.name,
+          original_url: `https://www.themoviedb.org/tv/${item.seriesTmdbId}`,
+          series_name: show.name,
+          imdb_id: show.external_ids?.imdb_id ?? undefined,
+          tvdb_id: show.external_ids?.tvdb_id ?? undefined,
+        };
+      }
+      case 'season': {
+        const show = await fetchTvShowMetadata(item.seriesTmdbId);
+        return {
+          title: `${show.name} Season ${item.seasonNumber}`,
+          original_title: `${show.name} Season ${item.seasonNumber}`,
+          original_url: `https://www.themoviedb.org/tv/${item.seriesTmdbId}/season/${item.seasonNumber}`,
+          series_name: show.name,
+          season_number: item.seasonNumber,
+          imdb_id: show.external_ids?.imdb_id ?? undefined,
+          tvdb_id: show.external_ids?.tvdb_id ?? undefined,
+        };
+      }
+      case 'episode': {
+        const show = await fetchTvShowMetadata(item.seriesTmdbId);
+        return {
+          title: `${show.name} S${item.seasonNumber}E${item.episodeNumber}`,
+          original_title: `${show.name} S${item.seasonNumber}E${item.episodeNumber}`,
+          original_url: `https://www.themoviedb.org/tv/${item.seriesTmdbId}/season/${item.seasonNumber}/episode/${item.episodeNumber}`,
+          series_name: show.name,
+          season_number: item.seasonNumber,
+          episode_number: item.episodeNumber,
+          imdb_id: show.external_ids?.imdb_id ?? undefined,
+          tvdb_id: show.external_ids?.tvdb_id ?? undefined,
+        };
+      }
+      default:
+        throw new HttpError('Unsupported list item type', { statusCode: 400 });
+    }
   }
 
   return {
@@ -73,6 +179,7 @@ export function createListService(options?: ServiceOptions) {
         include: {
           creator: { select: { id: true, username: true } },
           items: true,
+          flexgetConnection: true,
         },
       });
 
@@ -141,11 +248,69 @@ export function createListService(options?: ServiceOptions) {
       }
     },
 
+    async getListFlexgetConnection(listId: number, userId: number) {
+      const logger = localLogger('getListFlexgetConnection');
+      logger.debug({ listId, userId }, 'Fetching list Flexget connection');
+
+      const list = await ensureOwnedList(listId, userId);
+      return list.flexgetConnection;
+    },
+
+    async connectListToFlexget(listId: number, entryListName: string, userId: number) {
+      const logger = localLogger('connectListToFlexget');
+      logger.debug({ listId, entryListName, userId }, 'Connecting list to Flexget entry list');
+
+      await ensureOwnedList(listId, userId);
+      const integration = await flexgetService.ensureIntegration(userId);
+      const remoteList = await flexgetService.getOrCreateRemoteEntryList(
+        integration,
+        entryListName
+      );
+
+      return prisma.listIntegration.upsert({
+        where: { listId },
+        create: {
+          listId,
+          entryListName: remoteList.name,
+          remoteListId: remoteList.id,
+        },
+        update: {
+          entryListName: remoteList.name,
+          remoteListId: remoteList.id,
+        },
+      });
+    },
+
+    async disconnectListFromFlexget(listId: number, userId: number) {
+      const logger = localLogger('disconnectListFromFlexget');
+      logger.debug({ listId, userId }, 'Disconnecting list from Flexget');
+
+      await ensureOwnedList(listId, userId);
+      await prisma.listIntegration.deleteMany({ where: { listId } });
+    },
+
     async addItem(listId: number, item: ListItemInput, userId: number) {
       const logger = localLogger('addItem');
       logger.debug({ listId, item, userId }, 'Adding item to list');
 
-      await ensureOwnedList(listId, userId);
+      const list = await ensureOwnedList(listId, userId);
+      if (list.flexgetConnection) {
+        const integration = await flexgetService.ensureIntegration(userId);
+        const remoteList = await flexgetService.getOrCreateRemoteEntryList(
+          integration,
+          list.flexgetConnection.entryListName
+        );
+
+        if (remoteList.id !== list.flexgetConnection.remoteListId) {
+          await prisma.listIntegration.update({
+            where: { listId },
+            data: { remoteListId: remoteList.id, entryListName: remoteList.name },
+          });
+        }
+
+        const entryPayload = await mapItemToFlexgetEntry(item);
+        await flexgetService.pushEntryToRemoteList(integration, remoteList.id, entryPayload);
+      }
 
       return prisma.listItem.create({
         data: {

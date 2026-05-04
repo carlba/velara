@@ -13,6 +13,7 @@ export const envSchema = z
     JWT_SECRET: z.string().min(32),
     PORT: z.coerce.number().int().positive().default(3070),
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
+    FLEXGET_ALLOW_INSECURE_TLS: z.coerce.boolean().default(false),
   })
   .transform(raw => ({
     NODE_ENV: raw.NODE_ENV,
@@ -22,6 +23,7 @@ export const envSchema = z
     JWT_SECRET: raw.JWT_SECRET,
     PORT: raw.PORT,
     CORS_ORIGIN: raw.CORS_ORIGIN,
+    FLEXGET_ALLOW_INSECURE_TLS: raw.FLEXGET_ALLOW_INSECURE_TLS,
     isDevelopment: raw.NODE_ENV !== 'production',
   }));
 

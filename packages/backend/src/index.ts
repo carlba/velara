@@ -12,6 +12,7 @@ import { authRoutes } from './auth/auth-routes.js';
 import { movieRoutes } from './movies/movie-routes.js';
 import { tvRoutes } from './tv-shows/tv-show-routes.js';
 import { listRoutes } from './lists/list-routes.js';
+import { flexgetRoutes } from './flexget/flexget-routes.js';
 
 const logger = LOGGER.child({ module: 'index' });
 
@@ -42,8 +43,10 @@ server.setErrorHandler((error: unknown, request, reply) => {
 
 await server.register(fastifyHelmet);
 await server.register(fastifyCors, {
-  origin: config.CORS_ORIGIN,
+  origin: config.isDevelopment ? true : config.CORS_ORIGIN,
   credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 });
 await server.register(fastifyCookie);
 await server.register(fastifyJwt, {
@@ -58,6 +61,7 @@ await server.register(authRoutes, { prefix: '/api/auth' });
 await server.register(movieRoutes, { prefix: '/api/movies' });
 await server.register(tvRoutes, { prefix: '/api/tv' });
 await server.register(listRoutes, { prefix: '/api/lists' });
+await server.register(flexgetRoutes, { prefix: '/api/flexget' });
 
 server.get('/health', () => ({ status: 'ok' }));
 
