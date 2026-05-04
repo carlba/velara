@@ -148,6 +148,26 @@ export function createListService(options?: ServiceOptions) {
     }
   }
 
+  function buildListItemData(listId: number, item: ListItemInput, remoteEntryId?: number) {
+    return {
+      listId,
+      type: item.type,
+      ...(remoteEntryId !== undefined ? { remoteEntryId } : {}),
+      ...(item.type === 'movie' ? { movieTmdbId: item.movieTmdbId } : {}),
+      ...(item.type === 'series' ? { seriesTmdbId: item.seriesTmdbId } : {}),
+      ...(item.type === 'season'
+        ? { seriesTmdbId: item.seriesTmdbId, seasonNumber: item.seasonNumber }
+        : {}),
+      ...(item.type === 'episode'
+        ? {
+            seriesTmdbId: item.seriesTmdbId,
+            seasonNumber: item.seasonNumber,
+            episodeNumber: item.episodeNumber,
+          }
+        : {}),
+    };
+  }
+
   return {
     async getLists(userId: number | undefined, mine = false) {
       const logger = localLogger('getLists');
@@ -309,26 +329,19 @@ export function createListService(options?: ServiceOptions) {
         }
 
         const entryPayload = await mapItemToFlexgetEntry(item);
-        await flexgetService.pushEntryToRemoteList(integration, remoteList.id, entryPayload);
+        const remoteEntry = await flexgetService.pushEntryToRemoteList(
+          integration,
+          remoteList.id,
+          entryPayload
+        );
+
+        return prisma.listItem.create({
+          data: buildListItemData(listId, item, remoteEntry.id),
+        });
       }
 
       return prisma.listItem.create({
-        data: {
-          listId,
-          type: item.type,
-          ...(item.type === 'movie' ? { movieTmdbId: item.movieTmdbId } : {}),
-          ...(item.type === 'series' ? { seriesTmdbId: item.seriesTmdbId } : {}),
-          ...(item.type === 'season'
-            ? { seriesTmdbId: item.seriesTmdbId, seasonNumber: item.seasonNumber }
-            : {}),
-          ...(item.type === 'episode'
-            ? {
-                seriesTmdbId: item.seriesTmdbId,
-                seasonNumber: item.seasonNumber,
-                episodeNumber: item.episodeNumber,
-              }
-            : {}),
-        },
+        data: buildListItemData(listId, item),
       });
     },
 
@@ -336,19 +349,37 @@ export function createListService(options?: ServiceOptions) {
       const logger = localLogger('deleteItem');
       logger.debug({ listId, itemId, userId }, 'Removing item from list');
 
-      const result = await prisma.listItem.deleteMany({
-        where: {
-          id: itemId,
-          listId,
+      const item = await prisma.listItem.findUnique({
+        where: { id: itemId },
+        select: {
+          id: true,
+          listId: true,
+          remoteEntryId: true,
           list: {
-            creatorId: userId,
+            select: {
+              creatorId: true,
+              flexgetConnection: {
+                select: { entryListName: true, remoteListId: true },
+              },
+            },
           },
         },
       });
 
-      if (result.count === 0) {
+      if (item?.listId !== listId || item.list?.creatorId !== userId) {
         throw new HttpError('List item not found', { statusCode: 404 });
       }
+
+      if (item.list.flexgetConnection?.remoteListId && item.remoteEntryId != null) {
+        const integration = await flexgetService.ensureIntegration(userId);
+        await flexgetService.deleteEntryFromRemoteList(
+          integration,
+          item.list.flexgetConnection.remoteListId,
+          item.remoteEntryId
+        );
+      }
+
+      await prisma.listItem.delete({ where: { id: itemId } });
     },
   };
 }
