@@ -156,6 +156,7 @@ model ListItem {
   seriesTmdbId  String?
   seasonNumber  Int?
   episodeNumber Int?
+  remoteEntryId Int?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }

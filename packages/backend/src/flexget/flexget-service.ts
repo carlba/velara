@@ -26,6 +26,15 @@ export interface FlexgetEntryList {
   added_on?: string;
 }
 
+export interface FlexgetEntryListEntry {
+  id: number;
+  name?: string;
+  added_on?: string;
+  title?: string;
+  original_url?: string;
+  entry?: Record<string, unknown>;
+}
+
 export interface FlexgetEntryPayload {
   title: string;
   original_url: string;
@@ -141,7 +150,7 @@ export function createFlexgetService(options?: ServiceOptions) {
     integration: FlexgetIntegrationRecord,
     remoteListId: number,
     payload: FlexgetEntryPayload
-  ): Promise<void> {
+  ): Promise<FlexgetEntryListEntry> {
     const logger = localLogger('pushEntryToRemoteList');
     const client = await authenticateClient(integration);
 
@@ -158,6 +167,34 @@ export function createFlexgetService(options?: ServiceOptions) {
         throw new HttpError('Flexget list not found', { statusCode: 404 });
       }
       throw new HttpError('Failed to push item to Flexget entry list', { statusCode: 502 });
+    }
+
+    return response.body as unknown as FlexgetEntryListEntry;
+  }
+
+  async function deleteEntryFromRemoteList(
+    integration: FlexgetIntegrationRecord,
+    remoteListId: number,
+    remoteEntryId: number
+  ): Promise<void> {
+    const logger = localLogger('deleteEntryFromRemoteList');
+    const client = await authenticateClient(integration);
+
+    const response = await client.delete(`entry_list/${remoteListId}/entries/${remoteEntryId}/`);
+    if (response.statusCode === 404) {
+      logger.warn(
+        { remoteListId, remoteEntryId },
+        'Flexget entry was already missing when attempting deletion'
+      );
+      return;
+    }
+
+    if (response.statusCode !== 200) {
+      logger.error(
+        { statusCode: response.statusCode, body: response.body },
+        'Failed to delete entry from Flexget'
+      );
+      throw new HttpError('Failed to delete entry from Flexget list', { statusCode: 502 });
     }
   }
 
@@ -210,5 +247,6 @@ export function createFlexgetService(options?: ServiceOptions) {
     getRemoteEntryLists,
     getOrCreateRemoteEntryList,
     pushEntryToRemoteList,
+    deleteEntryFromRemoteList,
   };
 }
