@@ -11,7 +11,9 @@ const findManyMock = vi.fn();
 const createMock = vi.fn();
 const updateManyMock = vi.fn();
 const deleteManyMock = vi.fn();
+const listItemFindUniqueMock = vi.fn();
 const listItemCreateMock = vi.fn();
+const listItemDeleteMock = vi.fn();
 const listIntegrationUpsertMock = vi.fn();
 const listIntegrationDeleteManyMock = vi.fn();
 const ensureIntegrationMock = vi.fn().mockResolvedValue({
@@ -22,7 +24,8 @@ const ensureIntegrationMock = vi.fn().mockResolvedValue({
   password: 'pass',
 });
 const getOrCreateRemoteEntryListMock = vi.fn().mockResolvedValue({ id: 12, name: 'Remote list' });
-const pushEntryToRemoteListMock = vi.fn().mockResolvedValue(undefined);
+const pushEntryToRemoteListMock = vi.fn().mockResolvedValue({ id: 31, title: 'Created Entry' });
+const deleteEntryFromRemoteListMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../registry.js', () => ({
   LOGGER: loggerMock,
@@ -46,6 +49,7 @@ vi.mock('../flexget/flexget-service.js', () => ({
     ensureIntegration: ensureIntegrationMock,
     getOrCreateRemoteEntryList: getOrCreateRemoteEntryListMock,
     pushEntryToRemoteList: pushEntryToRemoteListMock,
+    deleteEntryFromRemoteList: deleteEntryFromRemoteListMock,
   }),
 }));
 vi.mock('../lib/prisma.js', () => ({
@@ -58,7 +62,9 @@ vi.mock('../lib/prisma.js', () => ({
       deleteMany: deleteManyMock,
     },
     listItem: {
+      findUnique: listItemFindUniqueMock,
       create: listItemCreateMock,
+      delete: listItemDeleteMock,
       deleteMany: deleteManyMock,
     },
     listIntegration: {
@@ -230,13 +236,18 @@ describe('list service', () => {
     expect(pushEntryToRemoteListMock).toHaveBeenCalledWith(
       expect.objectContaining({}),
       12,
-      expect.objectContaining({
+      expect.objectContaining<Record<string, unknown>>({
         title: expect.any(String),
         original_url: expect.stringContaining('themoviedb.org/movie/999'),
       })
     );
     expect(listItemCreateMock).toHaveBeenCalledWith({
-      data: { listId: 6, type: 'movie', movieTmdbId: 999 },
+      data: {
+        listId: 6,
+        type: 'movie',
+        remoteEntryId: 31,
+        movieTmdbId: 999,
+      },
     });
   });
 
@@ -265,7 +276,7 @@ describe('list service', () => {
     expect(pushEntryToRemoteListMock).toHaveBeenCalledWith(
       expect.objectContaining({}),
       12,
-      expect.objectContaining({
+      expect.objectContaining<Record<string, unknown>>({
         title: expect.any(String),
         original_url: expect.stringContaining('themoviedb.org/tv/123'),
         tvdb_id: 12345,
@@ -274,14 +285,40 @@ describe('list service', () => {
   });
 
   it('removes an owned item from a list', async () => {
-    deleteManyMock.mockResolvedValue({ count: 1 });
+    listItemFindUniqueMock.mockResolvedValue({
+      id: 77,
+      listId: 5,
+      remoteEntryId: null,
+      list: { creatorId: 11, flexgetConnection: null },
+    });
+    listItemDeleteMock.mockResolvedValue({ id: 77 });
 
     const { createListService } = await import('./list-service.js');
     const service = createListService({ logger: loggerMock });
 
     await expect(service.deleteItem(5, 77, 11)).resolves.toBeUndefined();
-    expect(deleteManyMock).toHaveBeenCalledWith({
-      where: { id: 77, listId: 5, list: { creatorId: 11 } },
+    expect(listItemDeleteMock).toHaveBeenCalledWith({ where: { id: 77 } });
+    expect(deleteEntryFromRemoteListMock).not.toHaveBeenCalled();
+  });
+
+  it('deletes a synced item from Flexget before removing the local item', async () => {
+    listItemFindUniqueMock.mockResolvedValue({
+      id: 77,
+      listId: 5,
+      remoteEntryId: 987,
+      list: {
+        creatorId: 11,
+        flexgetConnection: { entryListName: 'Remote list', remoteListId: 12 },
+      },
     });
+    listItemDeleteMock.mockResolvedValue({ id: 77 });
+
+    const { createListService } = await import('./list-service.js');
+    const service = createListService({ logger: loggerMock });
+
+    await expect(service.deleteItem(5, 77, 11)).resolves.toBeUndefined();
+    expect(ensureIntegrationMock).toHaveBeenCalledWith(11);
+    expect(deleteEntryFromRemoteListMock).toHaveBeenCalledWith(expect.any(Object), 12, 987);
+    expect(listItemDeleteMock).toHaveBeenCalledWith({ where: { id: 77 } });
   });
 });
