@@ -17,7 +17,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:truncate-except-users": "echo 'TRUNCATE TABLE \"Review\", \"WatchEntry\", \"Rating\", \"Comment\" RESTART IDENTITY CASCADE;' | prisma db execute --stdin --schema=./prisma/schema.prisma"
+    "db:truncate-except-users": "echo 'TRUNCATE TABLE \"Review\", \"WatchEntry\", \"Rating\", \"Comment\", \"TvWatchEntry\", \"TvRating\", \"TvReview\", \"TvComment\", \"ListItem\", \"List\", \"FlexgetIntegration\", \"ListIntegration\" RESTART IDENTITY CASCADE;' | prisma db execute --stdin --schema=./prisma/schema.prisma"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
