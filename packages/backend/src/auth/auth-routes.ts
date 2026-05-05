@@ -5,6 +5,13 @@ import { authenticate } from './auth-middleware.js';
 import { createAuthService } from './auth-service.js';
 
 const COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const authCookieOptions = {
+  httpOnly: true,
+  path: '/',
+  sameSite: config.isDevelopment ? 'lax' : 'none',
+  secure: !config.isDevelopment,
+  maxAge: COOKIE_MAX_AGE_SECONDS,
+} as const;
 
 const registerBodySchema = z.object({
   email: z.string().email(),
@@ -27,13 +34,7 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
       { expiresIn: '7d' }
     );
 
-    reply.setCookie('velara_token', token, {
-      httpOnly: true,
-      path: '/',
-      sameSite: 'none',
-      secure: !config.isDevelopment,
-      maxAge: COOKIE_MAX_AGE_SECONDS,
-    });
+    reply.setCookie('velara_token', token, authCookieOptions);
 
     return reply.code(201).send({ user });
   });
@@ -51,13 +52,7 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
       { expiresIn: '7d' }
     );
 
-    reply.setCookie('velara_token', token, {
-      httpOnly: true,
-      path: '/',
-      sameSite: 'none',
-      secure: !config.isDevelopment,
-      maxAge: COOKIE_MAX_AGE_SECONDS,
-    });
+    reply.setCookie('velara_token', token, authCookieOptions);
 
     return reply.send({ user });
   });
@@ -65,7 +60,7 @@ export const authRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
   fastify.post('/logout', async (_request, reply) => {
     reply.clearCookie('velara_token', {
       path: '/',
-      sameSite: 'none',
+      sameSite: config.isDevelopment ? 'lax' : 'none',
       secure: !config.isDevelopment,
     });
     return reply.send({ success: true });
