@@ -15,9 +15,11 @@ import type {
   TraktRatingEntry,
   TraktHistoryEntry,
 } from '../trakt.types.js';
+import { WatchSource } from '../watch/watch-source.js';
 
-const TRAKT_SOURCE = 'trakt';
-const FILMTIPSET_SOURCE = 'filmtipset';
+const TRAKT_SOURCE = WatchSource.Trakt;
+const FILMTIPSET_SOURCE_COMMENTS = WatchSource.FilmtipsetComments;
+const FILMTIPSET_SOURCE_RATINGS = WatchSource.FilmtipsetRatings;
 
 interface ImportLogger {
   error: (...args: unknown[]) => void;
@@ -566,13 +568,13 @@ export async function importFromFilmtipset(
           row.score,
           row.watchedAt,
           importTimestamp,
-          FILMTIPSET_SOURCE
+          FILMTIPSET_SOURCE_RATINGS
         );
         await watchService.getOrCreateWatchEntry(
           lookupResult.tmdbId,
           userId,
           row.watchedAt,
-          FILMTIPSET_SOURCE
+          FILMTIPSET_SOURCE_RATINGS
         );
         importedCount += 1;
       } catch (error) {
@@ -615,7 +617,7 @@ export async function importFromFilmtipset(
           lookupResult.tmdbId,
           userId,
           row.watchedAt,
-          FILMTIPSET_SOURCE
+          FILMTIPSET_SOURCE_COMMENTS
         );
         importedCount += 1;
       } catch (error) {
