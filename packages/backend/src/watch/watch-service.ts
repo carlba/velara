@@ -2,6 +2,10 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
+import {
+  DEFAULT_WATCH_SOURCE,
+  type WatchSource,
+} from './watch-source.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -20,7 +24,7 @@ export function createWatchService(options?: ServiceOptions) {
       tmdbId: number,
       userId: number,
       watchedAt: Date,
-      source = 'manual'
+      source: WatchSource = DEFAULT_WATCH_SOURCE
     ) {
       const logger = localLogger('getOrCreateWatchEntry');
       logger.debug({ tmdbId, userId, watchedAt, source }, 'Recording watch event');
@@ -59,7 +63,7 @@ export function createWatchService(options?: ServiceOptions) {
       tmdbId: number,
       userId: number,
       watchedAt: Date,
-      source = 'manual'
+      source: WatchSource = DEFAULT_WATCH_SOURCE
     ) {
       const logger = localLogger('createWatchEntryIfMissing');
       logger.debug({ tmdbId, userId, watchedAt, source }, 'Creating watch entry only if missing');

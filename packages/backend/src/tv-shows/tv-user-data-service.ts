@@ -107,7 +107,7 @@ export function createTvUserDataService(options?: ServiceOptions) {
         prisma.tvWatchEntry.findMany({
           where: { seriesTmdbId, userId },
           orderBy: [{ seasonNumber: 'asc' }, { episodeNumber: 'asc' }],
-          select: { seasonNumber: true, episodeNumber: true, latestWatchedAt: true },
+          select: { seasonNumber: true, episodeNumber: true, latestWatchedAt: true, source: true },
         }),
         prisma.tvWatchHistory.findMany({
           where: { seriesTmdbId, userId },
@@ -134,6 +134,7 @@ export function createTvUserDataService(options?: ServiceOptions) {
           seasonNumber: entry.seasonNumber,
           episodeNumber: entry.episodeNumber,
           watchedAt: entry.latestWatchedAt,
+          source: entry.source,
         })),
         watchHistory,
         showRating: showRating ? { score: showRating.score } : null,

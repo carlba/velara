@@ -2,6 +2,10 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
+import {
+  DEFAULT_WATCH_SOURCE,
+  type WatchSource,
+} from '../watch/watch-source.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -22,7 +26,7 @@ export function createTvWatchService(options?: ServiceOptions) {
       episodeNumber: number,
       userId: number,
       watchedAt: Date,
-      source = 'manual'
+      source: WatchSource = DEFAULT_WATCH_SOURCE
     ) {
       const logger = localLogger('markEpisodeWatched');
       logger.debug(
@@ -113,7 +117,7 @@ export function createTvWatchService(options?: ServiceOptions) {
       episodeNumber: number,
       userId: number,
       watchedAt: Date,
-      source = 'manual'
+      source: WatchSource = DEFAULT_WATCH_SOURCE
     ) {
       const logger = localLogger('createWatchEntryIfMissing');
       logger.debug(
