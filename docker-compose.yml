@@ -10,6 +10,8 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - velora
 
   backend:
     build:
@@ -25,6 +27,25 @@ services:
       DATABASE_URL: postgresql://velara:velara@postgres:5432/velara
     env_file:
       - .env
+    networks:
+      - velora
+
+  pgcli:
+    image: articulate/pgcli:4.4.0
+    restart: unless-stopped
+    environment:
+      TZ: 'Europe/Stockholm'
+    depends_on:
+      - postgres
+    entrypoint: ['pgcli', 'postgresql://velara:velara@postgres:5432/velara']
+    tty: true
+    stdin_open: true
+    networks:
+      - velora
 
 volumes:
   postgres_data:
+
+networks:
+  velora:
+    name: velara
