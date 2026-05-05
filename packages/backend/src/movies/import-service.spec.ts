@@ -12,6 +12,7 @@ process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-chars!!';
 
 const findMovieByImdbIdMock = vi.fn();
 const upsertRatingMock = vi.fn();
+const getOrCreateWatchEntryMock = vi.fn();
 const createWatchEntryIfMissingMock = vi.fn();
 
 vi.mock('./movie-service.js', () => ({
@@ -21,7 +22,10 @@ vi.mock('../ratings/rating-service.js', () => ({
   createRatingService: () => ({ upsertRating: upsertRatingMock }),
 }));
 vi.mock('../watch/watch-service.js', () => ({
-  createWatchService: () => ({ createWatchEntryIfMissing: createWatchEntryIfMissingMock }),
+  createWatchService: () => ({
+    getOrCreateWatchEntry: getOrCreateWatchEntryMock,
+    createWatchEntryIfMissing: createWatchEntryIfMissingMock,
+  }),
 }));
 
 let importService: typeof import('./import-service.js');
@@ -205,7 +209,7 @@ describe('Trakt import service', () => {
       expect.any(Date),
       'trakt'
     );
-    expect(createWatchEntryIfMissingMock).toHaveBeenCalledWith(
+    expect(getOrCreateWatchEntryMock).toHaveBeenCalledWith(
       123,
       1,
       new Date('2024-04-15T20:00:00Z'),

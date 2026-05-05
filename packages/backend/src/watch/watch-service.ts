@@ -23,13 +23,36 @@ export function createWatchService(options?: ServiceOptions) {
       source = 'manual'
     ) {
       const logger = localLogger('getOrCreateWatchEntry');
-      logger.debug({ tmdbId, userId, watchedAt, source }, 'Upserting watch entry');
+      logger.debug({ tmdbId, userId, watchedAt, source }, 'Recording watch event');
 
-      return prisma.watchEntry.upsert({
+      const existing = await prisma.watchEntry.findUnique({
         where: { tmdbId_userId: { tmdbId, userId } },
-        update: { watchedAt, source },
-        create: { tmdbId, userId, watchedAt, source },
       });
+
+      if (!existing) {
+        const [, watchEntry] = await prisma.$transaction([
+          prisma.watchHistory.create({
+            data: { tmdbId, userId, watchedAt, source },
+          }),
+          prisma.watchEntry.create({
+            data: { tmdbId, userId, latestWatchedAt: watchedAt, source },
+          }),
+        ]);
+        return watchEntry;
+      }
+
+      await prisma.watchHistory.create({
+        data: { tmdbId, userId, watchedAt, source },
+      });
+
+      if (watchedAt > existing.latestWatchedAt) {
+        return prisma.watchEntry.update({
+          where: { tmdbId_userId: { tmdbId, userId } },
+          data: { latestWatchedAt: watchedAt, source },
+        });
+      }
+
+      return existing;
     },
 
     async createWatchEntryIfMissing(
@@ -47,9 +70,16 @@ export function createWatchService(options?: ServiceOptions) {
 
       if (existing) return existing;
 
-      return prisma.watchEntry.create({
-        data: { tmdbId, userId, watchedAt, source },
-      });
+      const [, watchEntry] = await prisma.$transaction([
+        prisma.watchHistory.create({
+          data: { tmdbId, userId, watchedAt, source },
+        }),
+        prisma.watchEntry.create({
+          data: { tmdbId, userId, latestWatchedAt: watchedAt, source },
+        }),
+      ]);
+
+      return watchEntry;
     },
 
     async deleteWatchEntry(tmdbId: number, userId: number) {

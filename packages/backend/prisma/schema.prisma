@@ -19,8 +19,10 @@ model User {
   reviews        Review[]
   comments       Comment[]
   watchEntries   WatchEntry[]
+  watchHistories WatchHistory[]
   ratings        Rating[]
   tvWatchEntries TvWatchEntry[]
+  tvWatchHistories TvWatchHistory[]
   tvRatings      TvRating[]
   tvReviews      TvReview[]
   tvComments     TvComment[]
@@ -41,6 +43,18 @@ model Review {
 }
 
 model WatchEntry {
+  id              Int      @id @default(autoincrement())
+  tmdbId          Int
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latestWatchedAt DateTime
+  source          String   @default("manual")
+  createdAt       DateTime @default(now())
+
+  @@unique([tmdbId, userId])
+}
+
+model WatchHistory {
   id        Int      @id @default(autoincrement())
   tmdbId    Int
   userId    Int
@@ -49,7 +63,8 @@ model WatchEntry {
   source    String   @default("manual")
   createdAt DateTime @default(now())
 
-  @@unique([tmdbId, userId])
+  @@index([tmdbId])
+  @@index([userId])
 }
 
 model Rating {
@@ -81,6 +96,20 @@ model Comment {
 }
 
 model TvWatchEntry {
+  id              Int      @id @default(autoincrement())
+  seriesTmdbId    String
+  seasonNumber    Int
+  episodeNumber   Int
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latestWatchedAt DateTime
+  source          String   @default("manual")
+  createdAt       DateTime @default(now())
+
+  @@unique([seriesTmdbId, seasonNumber, episodeNumber, userId])
+}
+
+model TvWatchHistory {
   id            Int      @id @default(autoincrement())
   seriesTmdbId  String
   seasonNumber  Int
@@ -91,7 +120,8 @@ model TvWatchEntry {
   source        String   @default("manual")
   createdAt     DateTime @default(now())
 
-  @@unique([seriesTmdbId, seasonNumber, episodeNumber, userId])
+  @@index([seriesTmdbId])
+  @@index([userId])
 }
 
 model TvRating {

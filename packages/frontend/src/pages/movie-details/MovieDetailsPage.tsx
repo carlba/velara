@@ -222,6 +222,22 @@ export default function MovieDetailsPage() {
             )}
           </div>
 
+          {userData?.watchHistory?.length ? (
+            <div className="rounded-2xl border bg-card p-4">
+              <p className="text-sm font-medium">Watch history</p>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                {userData.watchHistory.map((entry, index) => (
+                  <li key={`${entry.watchedAt}-${index}`}>
+                    <span>{formatDateTime(entry.watchedAt)}</span>
+                    <span className="ml-2 text-xs uppercase tracking-wide text-muted-foreground">
+                      {entry.source}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           {/* Personal rating */}
           <div className="space-y-2">
             <p className="text-sm font-medium">Your Rating</p>
