@@ -306,7 +306,7 @@ async function importFromTraktExport(
     }
 
     try {
-      await watchService.createWatchEntryIfMissing(
+      await watchService.getOrCreateWatchEntry(
         resolved.tmdbId,
         userId,
         row.watchedAt,
@@ -369,7 +369,7 @@ async function importFromTraktExport(
       continue;
     }
     try {
-      await tvWatchService.createWatchEntryIfMissing(
+      await tvWatchService.markEpisodeWatched(
         seriesTmdbId,
         entry.episode.season,
         entry.episode.number,
@@ -447,7 +447,7 @@ async function importTvFromTraktExport(
       continue;
     }
     try {
-      await tvWatchService.createWatchEntryIfMissing(
+      await tvWatchService.markEpisodeWatched(
         seriesTmdbId,
         entry.episode.season,
         entry.episode.number,
@@ -568,7 +568,7 @@ export async function importFromFilmtipset(
           importTimestamp,
           FILMTIPSET_SOURCE
         );
-        await watchService.createWatchEntryIfMissing(
+        await watchService.getOrCreateWatchEntry(
           lookupResult.tmdbId,
           userId,
           row.watchedAt,
@@ -611,7 +611,7 @@ export async function importFromFilmtipset(
           row.watchedAt,
           importTimestamp
         );
-        await watchService.createWatchEntryIfMissing(
+        await watchService.getOrCreateWatchEntry(
           lookupResult.tmdbId,
           userId,
           row.watchedAt,

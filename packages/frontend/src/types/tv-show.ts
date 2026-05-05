@@ -60,8 +60,13 @@ export interface UserTvWatchEntry {
   watchedAt: string;
 }
 
+export interface UserTvHistoryEntry extends UserTvWatchEntry {
+  source: string;
+}
+
 export interface UserTvData {
   watchEntries: UserTvWatchEntry[];
+  watchHistory: UserTvHistoryEntry[];
   showRating: { score: number } | null;
   seasonRatings: Record<number, number>;
   review: { content: string } | null;

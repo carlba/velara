@@ -76,6 +76,8 @@ export default function TvShowDetailsPage() {
     setReviewText(undefined);
   };
 
+  const recentWatchHistory = userData?.watchHistory?.slice(0, 10) ?? [];
+
   const handlePostComment = () => {
     const trimmed = commentText.trim();
     if (!trimmed) return;
@@ -255,6 +257,31 @@ export default function TvShowDetailsPage() {
               )}
             </div>
           </div>
+
+          {recentWatchHistory.length > 0 ? (
+            <div className="rounded-2xl border bg-card p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Watch history</p>
+                <span className="text-xs text-muted-foreground">
+                  Last {recentWatchHistory.length} event{recentWatchHistory.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                {recentWatchHistory.map((entry, index) => (
+                  <li
+                    key={`${entry.seasonNumber}-${entry.episodeNumber}-${entry.watchedAt}-${index}`}>
+                    <span className="font-medium">
+                      S{entry.seasonNumber}E{entry.episodeNumber}
+                    </span>
+                    <span className="ml-2">{formatDateTime(entry.watchedAt)}</span>
+                    <span className="ml-2 text-xs uppercase tracking-wide text-muted-foreground">
+                      {entry.source}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <ListActionPanel itemName="show" itemPayload={{ type: 'series', seriesTmdbId: id }} />
         </div>

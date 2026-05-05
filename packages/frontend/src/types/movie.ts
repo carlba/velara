@@ -44,8 +44,14 @@ export interface MovieComment {
   };
 }
 
+export interface WatchHistoryEntry {
+  watchedAt: string;
+  source: string;
+}
+
 export interface UserMovieData {
   watchEntry: { watchedAt: string } | null;
+  watchHistory: WatchHistoryEntry[];
   rating: { score: number } | null;
   review: { content: string } | null;
 }

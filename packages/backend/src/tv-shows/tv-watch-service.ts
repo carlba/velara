@@ -27,10 +27,10 @@ export function createTvWatchService(options?: ServiceOptions) {
       const logger = localLogger('markEpisodeWatched');
       logger.debug(
         { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
-        'Upserting TV watch entry'
+        'Recording TV watch event'
       );
 
-      return prisma.tvWatchEntry.upsert({
+      const existing = await prisma.tvWatchEntry.findUnique({
         where: {
           seriesTmdbId_seasonNumber_episodeNumber_userId: {
             seriesTmdbId,
@@ -39,9 +39,46 @@ export function createTvWatchService(options?: ServiceOptions) {
             userId,
           },
         },
-        update: { watchedAt, source },
-        create: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
       });
+
+      if (!existing) {
+        const [, watchEntry] = await prisma.$transaction([
+          prisma.tvWatchHistory.create({
+            data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
+          }),
+          prisma.tvWatchEntry.create({
+            data: {
+              seriesTmdbId,
+              seasonNumber,
+              episodeNumber,
+              userId,
+              latestWatchedAt: watchedAt,
+              source,
+            },
+          }),
+        ]);
+        return watchEntry;
+      }
+
+      await prisma.tvWatchHistory.create({
+        data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
+      });
+
+      if (watchedAt > existing.latestWatchedAt) {
+        return prisma.tvWatchEntry.update({
+          where: {
+            seriesTmdbId_seasonNumber_episodeNumber_userId: {
+              seriesTmdbId,
+              seasonNumber,
+              episodeNumber,
+              userId,
+            },
+          },
+          data: { latestWatchedAt: watchedAt, source },
+        });
+      }
+
+      return existing;
     },
 
     async unmarkEpisodeWatched(
@@ -98,7 +135,14 @@ export function createTvWatchService(options?: ServiceOptions) {
       if (existing) return existing;
 
       return prisma.tvWatchEntry.create({
-        data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
+        data: {
+          seriesTmdbId,
+          seasonNumber,
+          episodeNumber,
+          userId,
+          latestWatchedAt: watchedAt,
+          source,
+        },
       });
     },
   };
