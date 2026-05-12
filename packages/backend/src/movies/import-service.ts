@@ -570,7 +570,7 @@ export async function importFromFilmtipset(
           importTimestamp,
           FILMTIPSET_SOURCE_RATINGS
         );
-        await watchService.getOrCreateWatchEntry(
+        await watchService.createWatchEntryIfMissing(
           lookupResult.tmdbId,
           userId,
           row.watchedAt,
@@ -613,7 +613,7 @@ export async function importFromFilmtipset(
           row.watchedAt,
           importTimestamp
         );
-        await watchService.getOrCreateWatchEntry(
+        await watchService.createWatchEntryIfMissing(
           lookupResult.tmdbId,
           userId,
           row.watchedAt,
