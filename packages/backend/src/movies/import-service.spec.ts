@@ -226,4 +226,34 @@ describe('Trakt import service', () => {
     expect(summary.skippedCount).toBe(0);
     expect(summary.errors).toEqual(['Invalid JSON content']);
   });
+
+  it('imports Filmtipset ratings without creating duplicate watch history for existing entries', async () => {
+    findMovieByImdbIdMock.mockResolvedValue({ success: true, tmdbId: 456 });
+    upsertRatingMock.mockResolvedValue({});
+    createWatchEntryIfMissingMock.mockResolvedValue({});
+
+    const { importRatingsFromFilmtipset } = importService;
+    const content = 'VoteDate;MovieTitle;IMDB;Score\n2024-06-01;Example Movie;4567890;4';
+
+    const summary = await importRatingsFromFilmtipset(2, content);
+
+    expect(summary.importedCount).toBe(1);
+    expect(summary.skippedCount).toBe(0);
+    expect(summary.errors).toEqual([]);
+    expect(upsertRatingMock).toHaveBeenCalledWith(
+      456,
+      2,
+      4,
+      expect.any(Date),
+      expect.any(Date),
+      'filmtipset.ratings'
+    );
+    expect(createWatchEntryIfMissingMock).toHaveBeenCalledWith(
+      456,
+      2,
+      expect.any(Date),
+      'filmtipset.ratings'
+    );
+    expect(getOrCreateWatchEntryMock).not.toHaveBeenCalled();
+  });
 });
