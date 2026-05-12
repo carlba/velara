@@ -313,6 +313,21 @@ export interface TraktHistoryEpisode {
 
 export type TraktHistoryEntry = TraktHistoryMovie | TraktHistoryEpisode;
 
+export interface TraktLastActivitiesCategory {
+  watched_at?: string;
+  rated_at?: string;
+  updated_at?: string;
+}
+
+export interface TraktLastActivities {
+  all?: string;
+  movies?: TraktLastActivitiesCategory;
+  episodes?: TraktLastActivitiesCategory;
+  shows?: TraktLastActivitiesCategory;
+  seasons?: TraktLastActivitiesCategory;
+  [key: string]: unknown;
+}
+
 export interface TraktCollectedMovie {
   collected_at: string;
   updated_at: string;

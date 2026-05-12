@@ -2,10 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
-import {
-  DEFAULT_WATCH_SOURCE,
-  type WatchSource,
-} from '../watch/watch-source.js';
+import { DEFAULT_WATCH_SOURCE, type WatchSource } from '../watch/watch-source.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -45,7 +42,24 @@ export function createTvWatchService(options?: ServiceOptions) {
         },
       });
 
+      const duplicateHistory = await prisma.tvWatchHistory.findFirst({
+        where: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt },
+      });
+
       if (!existing) {
+        if (duplicateHistory) {
+          return prisma.tvWatchEntry.create({
+            data: {
+              seriesTmdbId,
+              seasonNumber,
+              episodeNumber,
+              userId,
+              latestWatchedAt: watchedAt,
+              source,
+            },
+          });
+        }
+
         const [, watchEntry] = await prisma.$transaction([
           prisma.tvWatchHistory.create({
             data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
@@ -64,9 +78,11 @@ export function createTvWatchService(options?: ServiceOptions) {
         return watchEntry;
       }
 
-      await prisma.tvWatchHistory.create({
-        data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
-      });
+      if (!duplicateHistory) {
+        await prisma.tvWatchHistory.create({
+          data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
+        });
+      }
 
       if (watchedAt > existing.latestWatchedAt) {
         return prisma.tvWatchEntry.update({

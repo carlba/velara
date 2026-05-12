@@ -14,6 +14,8 @@ export const envSchema = z
     PORT: z.coerce.number().int().positive().default(3070),
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
     FLEXGET_ALLOW_INSECURE_TLS: z.coerce.boolean().default(false),
+    TRAKT_CLIENT_ID: z.string().min(1).optional(),
+    TRAKT_CLIENT_SECRET: z.string().min(1).optional(),
   })
   .transform(raw => ({
     NODE_ENV: raw.NODE_ENV,
@@ -24,6 +26,8 @@ export const envSchema = z
     PORT: raw.PORT,
     CORS_ORIGIN: raw.CORS_ORIGIN,
     FLEXGET_ALLOW_INSECURE_TLS: raw.FLEXGET_ALLOW_INSECURE_TLS,
+    TRAKT_CLIENT_ID: raw.TRAKT_CLIENT_ID,
+    TRAKT_CLIENT_SECRET: raw.TRAKT_CLIENT_SECRET,
     isDevelopment: raw.NODE_ENV !== 'production',
   }));
 

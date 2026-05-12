@@ -14,7 +14,7 @@ import type {
   TraktMovie,
   TraktRatingEntry,
   TraktHistoryEntry,
-} from '../trakt.types.js';
+} from '../trakt/trakt.types.js';
 import { WatchSource } from '../watch/watch-source.js';
 
 const TRAKT_SOURCE = WatchSource.Trakt;
