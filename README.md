@@ -22,7 +22,8 @@ Requires Node.js 24+, Docker (for PostgreSQL), and API keys for
 
 ```bash
 cp .env.example .env
-# Fill in DATABASE_URL, TMDB_API_KEY, OMDB_API_KEY, JWT_SECRET
+# Fill in DATABASE_URL, TMDB_API_KEY, OMDB_API_KEY, JWT_SECRET,
+# TRAKT_CLIENT_ID, and TRAKT_CLIENT_SECRET
 npm install
 cd packages/backend && npm run db:generate
 ```
@@ -57,7 +58,17 @@ npm run lint
 
 # Run tests
 npm test
+
+## Database dump and restore
+The database dump and restore commands execute `pg_dump` and `psql` inside the `postgres` container from the repository Docker Compose setup.
+
+```bash
+cd packages/backend
+npm run db:dump
+npm run db:restore
 ```
+
+The dump file is written to `packages/backend/db/velara.sql`.
 
 ## Contributing
 

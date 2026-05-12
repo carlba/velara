@@ -10,6 +10,7 @@ const findUniqueMock = vi.fn();
 const createWatchEntryMock = vi.fn();
 const updateWatchEntryMock = vi.fn();
 const createWatchHistoryMock = vi.fn();
+const findFirstHistoryMock = vi.fn();
 const transactionMock = vi.fn();
 
 vi.mock('../registry.js', () => ({ LOGGER: loggerMock }));
@@ -22,6 +23,7 @@ vi.mock('../lib/prisma.js', () => ({
     },
     tvWatchHistory: {
       create: createWatchHistoryMock,
+      findFirst: findFirstHistoryMock,
     },
     $transaction: transactionMock,
   },
@@ -87,6 +89,7 @@ describe('TV watch service', () => {
       latestWatchedAt: new Date('2023-01-01'),
     };
     findUniqueMock.mockResolvedValue(existingEntry);
+    findFirstHistoryMock.mockResolvedValue(null);
     createWatchHistoryMock.mockResolvedValue({});
     updateWatchEntryMock.mockResolvedValue({
       ...existingEntry,
@@ -123,5 +126,27 @@ describe('TV watch service', () => {
       },
       data: { latestWatchedAt: new Date('2024-01-01'), source: 'manual' },
     });
+  });
+
+  it('skips creating a duplicate TV watch history row when the exact event is already recorded', async () => {
+    const existingEntry = {
+      seriesTmdbId: '123',
+      seasonNumber: 1,
+      episodeNumber: 1,
+      userId: 42,
+      latestWatchedAt: new Date('2024-01-01'),
+    };
+
+    findUniqueMock.mockResolvedValue(existingEntry);
+    findFirstHistoryMock.mockResolvedValue({ id: 42 });
+
+    const { createTvWatchService } = await import('./tv-watch-service.js');
+    const service = createTvWatchService({ logger: loggerMock });
+
+    const result = await service.markEpisodeWatched('123', 1, 1, 42, new Date('2024-01-01'));
+
+    expect(result).toEqual(existingEntry);
+    expect(createWatchHistoryMock).not.toHaveBeenCalled();
+    expect(updateWatchEntryMock).not.toHaveBeenCalled();
   });
 });

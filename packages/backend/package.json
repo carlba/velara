@@ -17,6 +17,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "db:dump": "mkdir -p ./db && docker compose -f ../../docker-compose.yml exec -T postgres sh -c 'pg_dump --no-owner --no-privileges --dbname=\"postgresql://velara:velara@postgres:5432/velara\"' > ./db/velara.sql",
+    "db:restore": "docker compose -f ../../docker-compose.yml exec -T postgres psql --dbname=\"postgresql://velara:velara@postgres:5432/velara\" < ./db/velara.sql",
     "db:truncate-except-users": "echo 'TRUNCATE TABLE \"Review\", \"WatchEntry\", \"WatchHistory\", \"Rating\", \"Comment\", \"TvWatchEntry\", \"TvWatchHistory\", \"TvRating\", \"TvReview\", \"TvComment\" RESTART IDENTITY CASCADE;' | prisma db execute --stdin --schema=./prisma/schema.prisma"
   },
   "devDependencies": {

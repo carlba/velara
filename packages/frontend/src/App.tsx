@@ -9,6 +9,7 @@ import ListDetailsPage from '@/pages/lists/ListDetailsPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
+import TraktCallbackPage from '@/pages/trakt/TraktCallbackPage';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="lists" element={<ListsPage />} />
         <Route path="lists/:listId" element={<ListDetailsPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="trakt-callback" element={<TraktCallbackPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
       </Route>

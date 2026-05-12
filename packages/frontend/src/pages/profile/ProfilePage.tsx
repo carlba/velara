@@ -22,6 +22,12 @@ import {
 } from '@/services/flexget-api';
 import { importMovies, type ImportProvider, type ImportSummary } from '@/services/user-data-api';
 import { importTvShows } from '@/services/user-tv-data-api';
+import {
+  deleteTraktIntegration,
+  fetchTraktAuthUrl,
+  fetchTraktIntegration,
+  type TraktIntegration,
+} from '@/services/trakt-api';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -38,6 +44,11 @@ export default function ProfilePage() {
   const [isIntegrationLoading, setIsIntegrationLoading] = useState(true);
   const [isSavingIntegration, setIsSavingIntegration] = useState(false);
   const [isRemovingIntegration, setIsRemovingIntegration] = useState(false);
+
+  const [traktIntegration, setTraktIntegration] = useState<TraktIntegration | null>(null);
+  const [isTraktLoading, setIsTraktLoading] = useState(true);
+  const [isFetchingTraktUrl, setIsFetchingTraktUrl] = useState(false);
+  const [isDisconnectingTrakt, setIsDisconnectingTrakt] = useState(false);
 
   const tvFileInputRef = useRef<HTMLInputElement | null>(null);
   const [tvContent, setTvContent] = useState('');
@@ -133,6 +144,8 @@ export default function ProfilePage() {
     }
 
     setIsIntegrationLoading(true);
+    setIsTraktLoading(true);
+
     fetchFlexgetIntegration()
       .then(data => {
         setCurrentIntegration(data);
@@ -144,6 +157,17 @@ export default function ProfilePage() {
       })
       .finally(() => {
         setIsIntegrationLoading(false);
+      });
+
+    fetchTraktIntegration()
+      .then(data => {
+        setTraktIntegration(data.active ? data : null);
+      })
+      .catch(() => {
+        setTraktIntegration(null);
+      })
+      .finally(() => {
+        setIsTraktLoading(false);
       });
   }, [user]);
 
@@ -182,6 +206,37 @@ export default function ProfilePage() {
       toast.error('Unable to remove Flexget integration.');
     } finally {
       setIsRemovingIntegration(false);
+    }
+  };
+
+  const handleConnectTrakt = async () => {
+    setIsFetchingTraktUrl(true);
+    const redirectUri = `${window.location.origin}/trakt-callback`;
+
+    try {
+      const response = await fetchTraktAuthUrl(redirectUri);
+      window.location.href = response.url;
+    } catch {
+      toast.error('Unable to start Trakt connection.');
+    } finally {
+      setIsFetchingTraktUrl(false);
+    }
+  };
+
+  const handleDisconnectTrakt = async () => {
+    if (!window.confirm('Disconnect Trakt from your account?')) {
+      return;
+    }
+
+    setIsDisconnectingTrakt(true);
+    try {
+      await deleteTraktIntegration();
+      setTraktIntegration(null);
+      toast.success('Trakt disconnected.');
+    } catch {
+      toast.error('Unable to disconnect Trakt.');
+    } finally {
+      setIsDisconnectingTrakt(false);
     }
   };
 
@@ -365,6 +420,61 @@ export default function ProfilePage() {
               )}
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Trakt integration</CardTitle>
+          <CardDescription>
+            Connect your Trakt account so Velara can sync your ratings and watch history.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {traktIntegration ? (
+            <div className="rounded-lg border border-muted p-4">
+              <p className="text-sm text-muted-foreground">Connected account</p>
+              <p className="font-medium">
+                {traktIntegration.traktUsername || traktIntegration.traktSlug}
+              </p>
+              <p className="text-sm">
+                Last synced:{' '}
+                {traktIntegration.lastSyncedAt
+                  ? new Date(traktIntegration.lastSyncedAt).toLocaleString()
+                  : 'Unknown'}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-muted p-4">
+              <p className="text-sm text-muted-foreground">No Trakt account connected</p>
+              <p className="text-sm">
+                Click connect to authorize your Trakt account and enable automatic sync.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleConnectTrakt} disabled={isFetchingTraktUrl || isTraktLoading}>
+              {isFetchingTraktUrl
+                ? 'Opening Trakt…'
+                : traktIntegration
+                  ? 'Reconnect Trakt'
+                  : 'Connect Trakt'}
+            </Button>
+            {traktIntegration ? (
+              <Button
+                variant="destructive"
+                onClick={handleDisconnectTrakt}
+                disabled={isDisconnectingTrakt || isTraktLoading}>
+                Disconnect Trakt
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="rounded-lg border border-muted p-4 text-sm text-muted-foreground">
+            <p>Trakt will redirect back to:</p>
+            <p className="font-mono break-all">{window.location.origin}/trakt-callback</p>
+          </div>
         </CardContent>
       </Card>
 
