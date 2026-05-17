@@ -11,11 +11,13 @@ const findManyMock = vi.fn();
 const createMock = vi.fn();
 const updateManyMock = vi.fn();
 const deleteManyMock = vi.fn();
+const findFirstMock = vi.fn();
 const listItemFindUniqueMock = vi.fn();
 const listItemCreateMock = vi.fn();
 const listItemDeleteMock = vi.fn();
 const listIntegrationUpsertMock = vi.fn();
 const listIntegrationDeleteManyMock = vi.fn();
+const prismaTransactionMock = vi.fn();
 const ensureIntegrationMock = vi.fn().mockResolvedValue({
   id: 1,
   userId: 1,
@@ -23,6 +25,8 @@ const ensureIntegrationMock = vi.fn().mockResolvedValue({
   username: 'user',
   password: 'pass',
 });
+const getRemoteEntryListsMock = vi.fn().mockResolvedValue([]);
+const getRemoteEntryListEntriesMock = vi.fn().mockResolvedValue([]);
 const getOrCreateRemoteEntryListMock = vi.fn().mockResolvedValue({ id: 12, name: 'Remote list' });
 const pushEntryToRemoteListMock = vi.fn().mockResolvedValue({ id: 31, title: 'Created Entry' });
 const deleteEntryFromRemoteListMock = vi.fn().mockResolvedValue(undefined);
@@ -47,6 +51,8 @@ vi.mock('../movies/tmdb-client.js', () => ({
 vi.mock('../flexget/flexget-service.js', () => ({
   createFlexgetService: () => ({
     ensureIntegration: ensureIntegrationMock,
+    getRemoteEntryLists: getRemoteEntryListsMock,
+    getRemoteEntryListEntries: getRemoteEntryListEntriesMock,
     getOrCreateRemoteEntryList: getOrCreateRemoteEntryListMock,
     pushEntryToRemoteList: pushEntryToRemoteListMock,
     deleteEntryFromRemoteList: deleteEntryFromRemoteListMock,
@@ -56,6 +62,7 @@ vi.mock('../lib/prisma.js', () => ({
   prisma: {
     list: {
       findUnique: findUniqueMock,
+      findFirst: findFirstMock,
       findMany: findManyMock,
       create: createMock,
       updateMany: updateManyMock,
@@ -71,6 +78,7 @@ vi.mock('../lib/prisma.js', () => ({
       upsert: listIntegrationUpsertMock,
       deleteMany: listIntegrationDeleteManyMock,
     },
+    $transaction: prismaTransactionMock,
   },
 }));
 
@@ -209,6 +217,69 @@ describe('list service', () => {
       create: { listId: 5, entryListName: 'Remote list', remoteListId: 12 },
       update: { entryListName: 'Remote list', remoteListId: 12 },
     });
+  });
+
+  it('imports a remote Flexget list into Velara', async () => {
+    findFirstMock.mockResolvedValue(null);
+    getRemoteEntryListsMock.mockResolvedValue([
+      { id: 9, name: 'Remote list', added_on: '2026-01-01' },
+    ]);
+    getRemoteEntryListEntriesMock.mockResolvedValue([
+      { id: 101, title: 'Imported Movie', original_url: 'https://www.themoviedb.org/movie/555' },
+    ]);
+    createMock.mockResolvedValue({
+      id: 10,
+      title: 'Remote list',
+      description: 'Imported from Flexget on 2026-01-01',
+      creator: { id: 11, username: 'alex' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaTransactionMock.mockResolvedValue([]);
+
+    const { createListService } = await import('./list-service.js');
+    const service = createListService({ logger: loggerMock });
+
+    const imported = await service.importFlexgetList(9, 11);
+
+    expect(imported).toMatchObject({
+      id: 10,
+      title: 'Remote list',
+      description: 'Imported from Flexget on 2026-01-01',
+      creator: { id: 11, username: 'alex' },
+    });
+    expect(imported.createdAt).toBeInstanceOf(Date);
+    expect(imported.updatedAt).toBeInstanceOf(Date);
+
+    expect(findFirstMock).toHaveBeenCalledWith({
+      where: { creatorId: 11, title: 'Remote list' },
+      select: { id: true },
+    });
+    expect(createMock).toHaveBeenCalledWith({
+      data: {
+        title: 'Remote list',
+        description: 'Imported from Flexget on 2026-01-01',
+        creatorId: 11,
+      },
+      include: {
+        creator: { select: { id: true, username: true } },
+      },
+    });
+    expect(prismaTransactionMock).toHaveBeenCalled();
+  });
+
+  it('throws when importing a Flexget list with a duplicate name', async () => {
+    findFirstMock.mockResolvedValue({ id: 20 });
+    getRemoteEntryListsMock.mockResolvedValue([
+      { id: 9, name: 'Remote list', added_on: '2026-01-01' },
+    ]);
+
+    const { createListService } = await import('./list-service.js');
+    const service = createListService({ logger: loggerMock });
+
+    await expect(service.importFlexgetList(9, 11)).rejects.toThrow(
+      'A list with the same name already exists'
+    );
   });
 
   it('adds an item and pushes it to a connected Flexget list', async () => {

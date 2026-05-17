@@ -105,6 +105,28 @@ export function createFlexgetService(options?: ServiceOptions) {
     return response.body as FlexgetEntryList[];
   }
 
+  async function getRemoteEntryListEntries(
+    integration: FlexgetIntegrationRecord,
+    remoteListId: number
+  ) {
+    const logger = localLogger('getRemoteEntryListEntries');
+    const client = await authenticateClient(integration);
+
+    const response = await client.get(`entry_list/${remoteListId}/entries/`);
+    if (response.statusCode !== 200) {
+      logger.error(
+        { statusCode: response.statusCode, body: response.body, remoteListId },
+        'Failed to fetch remote entry list entries'
+      );
+      if (response.statusCode === 404) {
+        throw new HttpError('Flexget entry list not found', { statusCode: 404 });
+      }
+      throw new HttpError('Failed to fetch Flexget entry list entries', { statusCode: 502 });
+    }
+
+    return response.body as FlexgetEntryListEntry[];
+  }
+
   async function getRemoteEntryListByName(
     integration: FlexgetIntegrationRecord,
     name: string
@@ -246,6 +268,7 @@ export function createFlexgetService(options?: ServiceOptions) {
     ensureIntegration,
     getRemoteEntryLists,
     getOrCreateRemoteEntryList,
+    getRemoteEntryListEntries,
     pushEntryToRemoteList,
     deleteEntryFromRemoteList,
   };

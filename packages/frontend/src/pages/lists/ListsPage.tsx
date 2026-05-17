@@ -6,9 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { createList, fetchLists } from '@/services/lists-api';
+import { fetchFlexgetRemoteLists, importFlexgetRemoteList } from '@/services/flexget-api';
 import type { ListSummary } from '@/types/list';
+import type { FlexgetConnection } from '@/services/flexget-api';
 
 export default function ListsPage() {
   const { user, isLoading } = useAuth();
@@ -19,6 +22,12 @@ export default function ListsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingLists, setIsLoadingLists] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [remoteLists, setRemoteLists] = useState<FlexgetConnection[]>([]);
+  const [selectedRemoteListId, setSelectedRemoteListId] = useState<number | null>(null);
+  const [isLoadingRemoteLists, setIsLoadingRemoteLists] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -43,6 +52,30 @@ export default function ListsPage() {
 
     loadLists();
   }, [showMine, user]);
+
+  useEffect(() => {
+    if (!isImportDialogOpen || !user) {
+      return;
+    }
+
+    async function loadRemoteLists() {
+      setIsLoadingRemoteLists(true);
+      setImportError(null);
+      setRemoteLists([]);
+      setSelectedRemoteListId(null);
+
+      try {
+        const data = await fetchFlexgetRemoteLists();
+        setRemoteLists(data);
+      } catch {
+        setImportError('Unable to load Flexget entry lists. Check your integration settings.');
+      } finally {
+        setIsLoadingRemoteLists(false);
+      }
+    }
+
+    loadRemoteLists();
+  }, [isImportDialogOpen, user]);
 
   const handleCreateList = async () => {
     if (!title.trim()) {
@@ -75,6 +108,44 @@ export default function ListsPage() {
     }
   };
 
+  const openImportDialog = () => {
+    setImportError(null);
+    setSelectedRemoteListId(null);
+    setIsImportDialogOpen(true);
+  };
+
+  const closeImportDialog = () => {
+    setIsImportDialogOpen(false);
+  };
+
+  const handleImportSelectedList = async () => {
+    if (!selectedRemoteListId) {
+      setImportError('Please select a Flexget list to import.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportError(null);
+
+    try {
+      const imported = await importFlexgetRemoteList(selectedRemoteListId);
+      setLists(current => [
+        {
+          ...imported,
+          itemCount: 0,
+          description: imported.description ?? null,
+        },
+        ...current,
+      ]);
+      setIsImportDialogOpen(false);
+      toast.success(`Imported ${imported.title} from Flexget.`);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Unable to import list.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-16">
       <div className="space-y-1">
@@ -84,7 +155,7 @@ export default function ListsPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <Button
           variant={showMine ? 'default' : 'outline'}
           onClick={() => setShowMine(true)}
@@ -97,6 +168,11 @@ export default function ListsPage() {
           disabled={isLoadingLists}>
           All lists
         </Button>
+        {user ? (
+          <Button variant="secondary" onClick={openImportDialog} disabled={isLoadingLists}>
+            Import from Flexget
+          </Button>
+        ) : null}
       </div>
 
       {user ? (
@@ -155,6 +231,73 @@ export default function ListsPage() {
           </CardContent>
         </Card>
       )}
+
+      {isImportDialogOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-3xl rounded-3xl border border-border bg-background p-6 shadow-xl">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Import from Flexget</h2>
+                <p className="text-sm text-muted-foreground">
+                  Select a remote Flexget entry list to import into Velara.
+                </p>
+              </div>
+              <Button variant="ghost" onClick={closeImportDialog}>
+                Close
+              </Button>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              {isLoadingRemoteLists ? (
+                <div className="space-y-3">
+                  <div className="h-4 w-52 rounded-lg bg-muted animate-pulse" />
+                  <div className="h-4 w-32 rounded-lg bg-muted animate-pulse" />
+                </div>
+              ) : remoteLists.length === 0 ? (
+                <div className="rounded-xl border border-muted p-4 text-sm text-muted-foreground">
+                  No Flexget entry lists were found. Make sure your Flexget integration is
+                  configured.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto rounded-xl border border-muted p-2">
+                  {remoteLists.map(remoteList => (
+                    <button
+                      key={remoteList.remoteListId}
+                      type="button"
+                      className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition ${
+                        selectedRemoteListId === remoteList.remoteListId
+                          ? 'border-primary bg-primary/10'
+                          : 'border-transparent hover:border-border'
+                      }`}
+                      onClick={() => setSelectedRemoteListId(remoteList.remoteListId)}>
+                      <div>
+                        <p className="font-medium">{remoteList.entryListName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          ID: {remoteList.remoteListId}
+                        </p>
+                      </div>
+                      <div className="h-4 w-4 rounded-full border border-muted" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {importError ? <p className="text-sm text-destructive">{importError}</p> : null}
+
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="secondary" onClick={closeImportDialog}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleImportSelectedList}
+                  disabled={!selectedRemoteListId || isImporting || remoteLists.length === 0}>
+                  {isImporting ? 'Importing…' : 'Import selected list'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-4">
         {isLoadingLists ? (

@@ -2,6 +2,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
 import { createFlexgetService } from './flexget-service.js';
+import { createListService } from '../lists/list-service.js';
 
 const integrationBodySchema = z.object({
   baseUrl: z.string().url(),
@@ -55,6 +56,23 @@ export const flexgetRoutes: FastifyPluginCallbackZod = (fastify, _options, done)
     const lists = await flexgetService.getRemoteEntryLists(integration);
     return reply.send(lists);
   });
+
+  const importFlexgetListBodySchema = z.object({
+    remoteListId: z.coerce.number().int().positive(),
+  });
+
+  fastify.post(
+    '/import',
+    { preHandler: authenticate, schema: { body: importFlexgetListBodySchema } },
+    async (request, reply) => {
+      const listService = createListService({ logger: request.log });
+      const list = await listService.importFlexgetList(
+        request.body.remoteListId,
+        request.user.userId
+      );
+      return reply.code(201).send(list);
+    }
+  );
 
   done();
 };

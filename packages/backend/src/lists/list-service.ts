@@ -4,7 +4,7 @@ import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
 import { HttpError } from '../lib/http-error.js';
 import { tmdbClient } from '../movies/tmdb-client.js';
-import { createFlexgetService } from '../flexget/flexget-service.js';
+import { createFlexgetService, type FlexgetEntryListEntry } from '../flexget/flexget-service.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -146,6 +146,227 @@ export function createListService(options?: ServiceOptions) {
       default:
         throw new HttpError('Unsupported list item type', { statusCode: 400 });
     }
+  }
+
+  function coerceString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+  }
+
+  function coerceNumber(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }
+
+  async function findTmdbMappingByExternalId(
+    externalId: string,
+    source: 'imdb_id' | 'tvdb_id'
+  ): Promise<ListItemInput | null> {
+    try {
+      const response = await tmdbClient
+        .get(`find/${externalId}`, {
+          searchParams: { external_source: source },
+        })
+        .json<{
+          movie_results: { id: number }[];
+          tv_results: { id: number }[];
+          tv_episode_results: Record<string, unknown>[];
+          tv_season_results: Record<string, unknown>[];
+        }>();
+
+      if (response.movie_results?.length > 0) {
+        return { type: 'movie', movieTmdbId: response.movie_results[0].id };
+      }
+
+      if (response.tv_episode_results?.length > 0) {
+        const episode = response.tv_episode_results[0];
+        const seriesTmdbId = coerceString(episode.show_id ?? episode.series_id ?? episode.showId);
+        const seasonNumber = coerceNumber(episode.season_number ?? episode.seasonNumber);
+        const episodeNumber = coerceNumber(episode.episode_number ?? episode.episodeNumber);
+        if (seriesTmdbId && seasonNumber !== undefined && episodeNumber !== undefined) {
+          return {
+            type: 'episode',
+            seriesTmdbId,
+            seasonNumber,
+            episodeNumber,
+          };
+        }
+      }
+
+      if (response.tv_season_results?.length > 0) {
+        const season = response.tv_season_results[0];
+        const seriesTmdbId = coerceString(season.show_id ?? season.series_id ?? season.showId);
+        const seasonNumber = coerceNumber(season.season_number ?? season.seasonNumber);
+        if (seriesTmdbId && seasonNumber !== undefined) {
+          return { type: 'season', seriesTmdbId, seasonNumber };
+        }
+      }
+
+      if (response.tv_results?.length > 0) {
+        return { type: 'series', seriesTmdbId: String(response.tv_results[0].id) };
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function parseTmdbUrlToListItem(url: string): Promise<ListItemInput | null> {
+    try {
+      const parsed = new URL(url);
+      const pathParts = parsed.pathname.replace(/^\/+|\/+$/g, '').split('/');
+      const host = parsed.hostname.toLowerCase();
+
+      if (host.includes('themoviedb.org')) {
+        if (pathParts[0] === 'movie' && pathParts[1]) {
+          const id = coerceNumber(pathParts[1]);
+          if (id !== undefined) return { type: 'movie', movieTmdbId: id };
+        }
+
+        if (pathParts[0] === 'tv' && pathParts[1]) {
+          const seriesTmdbId = String(pathParts[1]);
+          if (pathParts[2] === 'season' && pathParts[3]) {
+            const seasonNumber = coerceNumber(pathParts[3]);
+            if (seasonNumber !== undefined) {
+              if (pathParts[4] === 'episode' && pathParts[5]) {
+                const episodeNumber = coerceNumber(pathParts[5]);
+                if (episodeNumber !== undefined) {
+                  return {
+                    type: 'episode',
+                    seriesTmdbId,
+                    seasonNumber,
+                    episodeNumber,
+                  };
+                }
+              }
+              return { type: 'season', seriesTmdbId, seasonNumber };
+            }
+          }
+          return { type: 'series', seriesTmdbId };
+        }
+      }
+
+      const imdbMatch = /title\/(tt[0-9]+)/.exec(parsed.pathname);
+      if (imdbMatch?.[1]) {
+        return await findTmdbMappingByExternalId(imdbMatch[1], 'imdb_id');
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function mapFlexgetEntryToListItem(entry: FlexgetEntryListEntry): Promise<ListItemInput> {
+    const metadata = entry.entry ?? {};
+    const originalUrl = coerceString(entry.original_url ?? metadata.original_url ?? metadata.url);
+    const imdbId = coerceString(metadata.imdb_id) ?? coerceString(metadata.imdbId);
+    const tvdbId = coerceNumber(metadata.tvdb_id);
+    const seasonNumber = coerceNumber(metadata.season_number);
+    const episodeNumber = coerceNumber(metadata.episode_number);
+
+    if (originalUrl) {
+      const parsed = await parseTmdbUrlToListItem(originalUrl);
+      if (parsed) return parsed;
+    }
+
+    if (imdbId) {
+      const mapped = await findTmdbMappingByExternalId(imdbId, 'imdb_id');
+      if (mapped) return mapped;
+    }
+
+    if (tvdbId !== undefined) {
+      const mapped = await findTmdbMappingByExternalId(String(tvdbId), 'tvdb_id');
+      if (mapped) return mapped;
+    }
+
+    if (
+      seasonNumber !== undefined &&
+      episodeNumber !== undefined &&
+      typeof metadata.series_name === 'string'
+    ) {
+      const seriesTmdbId = coerceString(
+        metadata.series_tmdb_id ?? metadata.seriesId ?? metadata.show_id
+      );
+      if (seriesTmdbId) {
+        return {
+          type: 'episode',
+          seriesTmdbId,
+          seasonNumber,
+          episodeNumber,
+        };
+      }
+    }
+
+    if (seasonNumber !== undefined && typeof metadata.series_name === 'string') {
+      const seriesTmdbId = coerceString(
+        metadata.series_tmdb_id ?? metadata.seriesId ?? metadata.show_id
+      );
+      if (seriesTmdbId) {
+        return { type: 'season', seriesTmdbId, seasonNumber };
+      }
+    }
+
+    throw new HttpError(
+      'Unable to import Flexget list entry because it cannot be mapped to a Velara list item',
+      {
+        statusCode: 502,
+      }
+    );
+  }
+
+  async function buildListItemsFromFlexgetEntries(
+    listId: number,
+    entries: FlexgetEntryListEntry[]
+  ) {
+    const itemData = await Promise.all(
+      entries.map(async entry => buildListItemData(listId, await mapFlexgetEntryToListItem(entry)))
+    );
+
+    await prisma.$transaction(itemData.map(data => prisma.listItem.create({ data })));
+  }
+
+  async function importFlexgetList(remoteListId: number, userId: number) {
+    const logger = localLogger('importFlexgetList');
+    logger.debug({ remoteListId, userId }, 'Importing Flexget list');
+
+    const integration = await flexgetService.ensureIntegration(userId);
+    const remoteLists = await flexgetService.getRemoteEntryLists(integration);
+    const remoteList = remoteLists.find(list => list.id === remoteListId);
+
+    if (!remoteList) {
+      throw new HttpError('Flexget entry list not found', { statusCode: 404 });
+    }
+
+    const existing = await prisma.list.findFirst({
+      where: { creatorId: userId, title: remoteList.name },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new HttpError('A list with the same name already exists', { statusCode: 409 });
+    }
+
+    const entries = await flexgetService.getRemoteEntryListEntries(integration, remoteListId);
+    const list = await prisma.list.create({
+      data: {
+        title: remoteList.name,
+        description: remoteList.added_on
+          ? `Imported from Flexget on ${remoteList.added_on}`
+          : 'Imported from Flexget',
+        creatorId: userId,
+      },
+      include: {
+        creator: { select: { id: true, username: true } },
+      },
+    });
+
+    await buildListItemsFromFlexgetEntries(list.id, entries);
+    return list;
   }
 
   function buildListItemData(listId: number, item: ListItemInput, remoteEntryId?: number) {
@@ -307,6 +528,10 @@ export function createListService(options?: ServiceOptions) {
 
       await ensureOwnedList(listId, userId);
       await prisma.listIntegration.deleteMany({ where: { listId } });
+    },
+
+    async importFlexgetList(remoteListId: number, userId: number) {
+      return importFlexgetList(remoteListId, userId);
     },
 
     async addItem(listId: number, item: ListItemInput, userId: number) {
