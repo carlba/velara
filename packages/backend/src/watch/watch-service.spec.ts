@@ -53,15 +53,13 @@ describe('watch service', () => {
     expect(updateWatchEntryMock).not.toHaveBeenCalled();
   });
 
-  it('creates a new watch entry and history row when none exists', async () => {
+  it('creates a new watch entry and nested history row when none exists', async () => {
     findUniqueMock.mockResolvedValue(null);
-    createWatchHistoryMock.mockResolvedValue({ id: 1 });
     createWatchEntryMock.mockResolvedValue({
       tmdbId: 12,
       userId: 34,
       latestWatchedAt: new Date('2024-01-01'),
     });
-    transactionMock.mockImplementation(async operations => Promise.all(operations));
 
     const { createWatchService } = await import('./watch-service.js');
     const service = createWatchService({ logger: loggerMock });
@@ -69,17 +67,27 @@ describe('watch service', () => {
     const result = await service.getOrCreateWatchEntry(12, 34, new Date('2024-01-01'));
 
     expect(result).toEqual({ tmdbId: 12, userId: 34, latestWatchedAt: new Date('2024-01-01') });
-    expect(transactionMock).toHaveBeenCalled();
-    expect(createWatchHistoryMock).toHaveBeenCalledWith({
-      data: { tmdbId: 12, userId: 34, watchedAt: new Date('2024-01-01'), source: 'manual' },
-    });
+    expect(createWatchHistoryMock).not.toHaveBeenCalled();
     expect(createWatchEntryMock).toHaveBeenCalledWith({
-      data: { tmdbId: 12, userId: 34, latestWatchedAt: new Date('2024-01-01'), source: 'manual' },
+      data: {
+        tmdbId: 12,
+        userId: 34,
+        latestWatchedAt: new Date('2024-01-01'),
+        source: 'manual',
+        watchHistory: {
+          create: [{ tmdbId: 12, userId: 34, watchedAt: new Date('2024-01-01'), source: 'manual' }],
+        },
+      },
     });
   });
 
   it('updates the latest watch entry when a newer watch event arrives', async () => {
-    const existingEntry = { tmdbId: 12, userId: 34, latestWatchedAt: new Date('2023-01-01') };
+    const existingEntry = {
+      id: 99,
+      tmdbId: 12,
+      userId: 34,
+      latestWatchedAt: new Date('2023-01-01'),
+    };
     findUniqueMock.mockResolvedValue(existingEntry);
     createWatchHistoryMock.mockResolvedValue({});
     updateWatchEntryMock.mockResolvedValue({
@@ -95,7 +103,13 @@ describe('watch service', () => {
 
     expect(result).toEqual({ tmdbId: 12, userId: 34, latestWatchedAt: new Date('2024-01-01') });
     expect(createWatchHistoryMock).toHaveBeenCalledWith({
-      data: { tmdbId: 12, userId: 34, watchedAt: new Date('2024-01-01'), source: 'manual' },
+      data: {
+        tmdbId: 12,
+        userId: 34,
+        watchedAt: new Date('2024-01-01'),
+        source: 'manual',
+        watchEntryId: 99,
+      },
     });
     expect(updateWatchEntryMock).toHaveBeenCalledWith({
       where: { tmdbId_userId: { tmdbId: 12, userId: 34 } },

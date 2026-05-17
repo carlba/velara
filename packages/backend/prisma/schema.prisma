@@ -28,6 +28,7 @@ model User {
   tvComments     TvComment[]
   lists          List[]
   flexgetIntegration FlexgetIntegration?
+  traktIntegration TraktIntegration?
 }
 
 model Review {
@@ -50,21 +51,25 @@ model WatchEntry {
   latestWatchedAt DateTime
   source          String   @default("manual")
   createdAt       DateTime @default(now())
+  watchHistory    WatchHistory[]
 
   @@unique([tmdbId, userId])
 }
 
 model WatchHistory {
-  id        Int      @id @default(autoincrement())
-  tmdbId    Int
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  watchedAt DateTime
-  source    String   @default("manual")
-  createdAt DateTime @default(now())
+  id            Int        @id @default(autoincrement())
+  tmdbId        Int
+  userId        Int
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchEntryId  Int
+  watchEntry    WatchEntry @relation(fields: [watchEntryId], references: [id], onDelete: Cascade)
+  watchedAt     DateTime
+  source        String     @default("manual")
+  createdAt     DateTime   @default(now())
 
   @@index([tmdbId])
   @@index([userId])
+  @@index([watchEntryId])
 }
 
 model Rating {
@@ -96,32 +101,36 @@ model Comment {
 }
 
 model TvWatchEntry {
-  id              Int      @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   seriesTmdbId    String
   seasonNumber    Int
   episodeNumber   Int
   userId          Int
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   latestWatchedAt DateTime
-  source          String   @default("manual")
-  createdAt       DateTime @default(now())
+  source          String        @default("manual")
+  createdAt       DateTime      @default(now())
+  watchHistory    TvWatchHistory[]
 
   @@unique([seriesTmdbId, seasonNumber, episodeNumber, userId])
 }
 
 model TvWatchHistory {
-  id            Int      @id @default(autoincrement())
-  seriesTmdbId  String
-  seasonNumber  Int
-  episodeNumber Int
-  userId        Int
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  watchedAt     DateTime
-  source        String   @default("manual")
-  createdAt     DateTime @default(now())
+  id             Int           @id @default(autoincrement())
+  seriesTmdbId   String
+  seasonNumber   Int
+  episodeNumber  Int
+  userId         Int
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tvWatchEntryId Int
+  tvWatchEntry   TvWatchEntry  @relation(fields: [tvWatchEntryId], references: [id], onDelete: Cascade)
+  watchedAt      DateTime
+  source         String        @default("manual")
+  createdAt      DateTime      @default(now())
 
   @@index([seriesTmdbId])
   @@index([userId])
+  @@index([tvWatchEntryId])
 }
 
 model TvRating {
@@ -208,6 +217,20 @@ model ListIntegration {
   listId        Int      @unique
   entryListName String
   remoteListId  Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TraktIntegration {
+  id            Int      @id @default(autoincrement())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int      @unique
+  accessToken   String
+  refreshToken  String
+  expiresAt     DateTime
+  traktUsername String?
+  traktSlug     String?
+  lastSyncedAt  DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

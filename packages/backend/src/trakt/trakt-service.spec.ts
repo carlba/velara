@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./registry.js', () => {
+vi.mock('../registry.js', () => {
   const loggerMock = {
     child: vi.fn().mockReturnThis(),
     debug: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('got', () => {
   };
 });
 
-vi.mock('./lib/prisma.js', () => {
+vi.mock('../lib/prisma.js', () => {
   const upsertMock = vi.fn();
   const updateMock = vi.fn();
 
@@ -99,7 +99,7 @@ describe('Trakt service', () => {
       __testMocks: GotTestMocks['__testMocks'];
     };
     const { postMock, getMock } = gotMock.__testMocks;
-    const prismaMock = (await vi.importMock('./lib/prisma.js')) as unknown as {
+    const prismaMock = (await vi.importMock('../lib/prisma.js')) as unknown as {
       __testMocks: PrismaTestMocks['__testMocks'];
     };
     const { upsertMock } = prismaMock.__testMocks;
@@ -162,7 +162,7 @@ describe('Trakt service', () => {
       __testMocks: GotTestMocks['__testMocks'];
     };
     const { getMock } = gotMock.__testMocks as { getMock: TestMock };
-    const prismaMock = (await vi.importMock('./lib/prisma.js')) as unknown as {
+    const prismaMock = (await vi.importMock('../lib/prisma.js')) as unknown as {
       __testMocks: PrismaTestMocks['__testMocks'];
     };
     const { updateMock } = prismaMock.__testMocks as { updateMock: TestMock };
@@ -221,7 +221,7 @@ describe('Trakt service', () => {
       __testMocks: GotTestMocks['__testMocks'];
     };
     const { getMock } = gotMock.__testMocks as { getMock: TestMock };
-    const prismaMock = (await vi.importMock('./lib/prisma.js')) as unknown as {
+    const prismaMock = (await vi.importMock('../lib/prisma.js')) as unknown as {
       __testMocks: PrismaTestMocks['__testMocks'];
     };
     const { updateMock } = prismaMock.__testMocks as { updateMock: TestMock };

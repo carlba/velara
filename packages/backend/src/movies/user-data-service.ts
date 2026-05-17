@@ -95,15 +95,17 @@ export function createUserDataService(options?: ServiceOptions) {
       const logger = localLogger('getUserMovieData');
       logger.debug({ tmdbId, userId }, 'Loading user movie data');
 
-      const [watchEntry, watchHistory, rating, review] = await Promise.all([
+      const [watchEntry, rating, review] = await Promise.all([
         prisma.watchEntry.findUnique({
           where: { tmdbId_userId: { tmdbId, userId } },
-          select: { latestWatchedAt: true, source: true },
-        }),
-        prisma.watchHistory.findMany({
-          where: { tmdbId, userId },
-          orderBy: { watchedAt: 'desc' },
-          select: { watchedAt: true, source: true },
+          select: {
+            latestWatchedAt: true,
+            source: true,
+            watchHistory: {
+              orderBy: { watchedAt: 'desc' },
+              select: { watchedAt: true, source: true },
+            },
+          },
         }),
         prisma.rating.findUnique({ where: { tmdbId_userId: { tmdbId, userId } } }),
         prisma.review.findUnique({ where: { tmdbId_userId: { tmdbId, userId } } }),
@@ -113,7 +115,7 @@ export function createUserDataService(options?: ServiceOptions) {
         watchEntry: watchEntry
           ? { watchedAt: watchEntry.latestWatchedAt, source: watchEntry.source }
           : null,
-        watchHistory,
+        watchHistory: watchEntry?.watchHistory ?? [],
         rating: rating ? { score: rating.score } : null,
         review: review ? { content: review.content } : null,
       };

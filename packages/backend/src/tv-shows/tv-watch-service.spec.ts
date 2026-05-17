@@ -35,16 +35,14 @@ describe('TV watch service', () => {
     vi.clearAllMocks();
   });
 
-  it('creates a new TV watch entry and history row when none exists', async () => {
+  it('creates a new TV watch entry and nested history row when none exists', async () => {
     findUniqueMock.mockResolvedValue(null);
-    createWatchHistoryMock.mockResolvedValue({ id: 1 });
     createWatchEntryMock.mockResolvedValue({
       seriesTmdbId: '123',
       seasonNumber: 1,
       episodeNumber: 1,
       latestWatchedAt: new Date('2024-01-01'),
     });
-    transactionMock.mockImplementation(async operations => Promise.all(operations));
 
     const { createTvWatchService } = await import('./tv-watch-service.js');
     const service = createTvWatchService({ logger: loggerMock });
@@ -57,17 +55,7 @@ describe('TV watch service', () => {
       episodeNumber: 1,
       latestWatchedAt: new Date('2024-01-01'),
     });
-    expect(transactionMock).toHaveBeenCalled();
-    expect(createWatchHistoryMock).toHaveBeenCalledWith({
-      data: {
-        seriesTmdbId: '123',
-        seasonNumber: 1,
-        episodeNumber: 1,
-        userId: 42,
-        watchedAt: new Date('2024-01-01'),
-        source: 'manual',
-      },
-    });
+    expect(createWatchHistoryMock).not.toHaveBeenCalled();
     expect(createWatchEntryMock).toHaveBeenCalledWith({
       data: {
         seriesTmdbId: '123',
@@ -76,12 +64,25 @@ describe('TV watch service', () => {
         userId: 42,
         latestWatchedAt: new Date('2024-01-01'),
         source: 'manual',
+        watchHistory: {
+          create: [
+            {
+              seriesTmdbId: '123',
+              seasonNumber: 1,
+              episodeNumber: 1,
+              userId: 42,
+              watchedAt: new Date('2024-01-01'),
+              source: 'manual',
+            },
+          ],
+        },
       },
     });
   });
 
   it('updates the latest TV watch entry when a newer watch event arrives', async () => {
     const existingEntry = {
+      id: 99,
       seriesTmdbId: '123',
       seasonNumber: 1,
       episodeNumber: 1,
@@ -113,6 +114,7 @@ describe('TV watch service', () => {
         userId: 42,
         watchedAt: new Date('2024-01-01'),
         source: 'manual',
+        tvWatchEntryId: 99,
       },
     });
     expect(updateWatchEntryMock).toHaveBeenCalledWith({

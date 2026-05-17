@@ -103,16 +103,20 @@ export function createTvUserDataService(options?: ServiceOptions) {
       const logger = localLogger('getUserTvData');
       logger.debug({ seriesTmdbId, userId }, 'Loading user TV show data');
 
-      const [watchEntries, watchHistory, ratings, review] = await Promise.all([
+      const [watchEntries, ratings, review] = await Promise.all([
         prisma.tvWatchEntry.findMany({
           where: { seriesTmdbId, userId },
           orderBy: [{ seasonNumber: 'asc' }, { episodeNumber: 'asc' }],
-          select: { seasonNumber: true, episodeNumber: true, latestWatchedAt: true, source: true },
-        }),
-        prisma.tvWatchHistory.findMany({
-          where: { seriesTmdbId, userId },
-          orderBy: { watchedAt: 'desc' },
-          select: { seasonNumber: true, episodeNumber: true, watchedAt: true, source: true },
+          select: {
+            seasonNumber: true,
+            episodeNumber: true,
+            latestWatchedAt: true,
+            source: true,
+            watchHistory: {
+              orderBy: { watchedAt: 'desc' },
+              select: { watchedAt: true, source: true },
+            },
+          },
         }),
         prisma.tvRating.findMany({
           where: { seriesTmdbId, userId },
@@ -121,6 +125,15 @@ export function createTvUserDataService(options?: ServiceOptions) {
         }),
         prisma.tvReview.findUnique({ where: { seriesTmdbId_userId: { seriesTmdbId, userId } } }),
       ]);
+
+      const watchHistory = watchEntries.flatMap(entry =>
+        entry.watchHistory.map(history => ({
+          seasonNumber: entry.seasonNumber,
+          episodeNumber: entry.episodeNumber,
+          watchedAt: history.watchedAt,
+          source: history.source,
+        }))
+      );
 
       const showRating = ratings.find(rating => rating.seasonNumber === 0);
       const seasonRatings = Object.fromEntries(
