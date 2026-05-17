@@ -1,4 +1,5 @@
 import { apiRequest } from './api-client';
+import type { ListSummary } from '@/types/list';
 
 export interface FlexgetIntegration {
   baseUrl: string;
@@ -11,6 +12,11 @@ export interface FlexgetIntegrationInput {
   baseUrl: string;
   username: string;
   password: string;
+}
+
+interface RawFlexgetRemoteList {
+  id: number;
+  name: string;
 }
 
 export interface FlexgetConnection {
@@ -38,7 +44,16 @@ export async function deleteFlexgetIntegration(): Promise<void> {
 }
 
 export async function fetchFlexgetRemoteLists(): Promise<FlexgetConnection[]> {
-  return apiRequest<FlexgetConnection[]>('/api/flexget/remote-lists');
+  return apiRequest<RawFlexgetRemoteList[]>('/api/flexget/remote-lists').then(lists =>
+    lists.map(list => ({ entryListName: list.name, remoteListId: list.id }))
+  );
+}
+
+export async function importFlexgetRemoteList(remoteListId: number): Promise<ListSummary> {
+  return apiRequest<ListSummary>('/api/flexget/import', {
+    method: 'POST',
+    body: JSON.stringify({ remoteListId }),
+  });
 }
 
 export async function connectListToFlexget(
