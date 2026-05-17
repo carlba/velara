@@ -47,40 +47,58 @@ export function createTvWatchService(options?: ServiceOptions) {
       });
 
       if (!existing) {
+        const watchEntry = await prisma.tvWatchEntry.create({
+          data: {
+            seriesTmdbId,
+            seasonNumber,
+            episodeNumber,
+            userId,
+            latestWatchedAt: watchedAt,
+            source,
+            watchHistory: duplicateHistory
+              ? undefined
+              : {
+                  create: [
+                    {
+                      seriesTmdbId,
+                      seasonNumber,
+                      episodeNumber,
+                      userId,
+                      watchedAt,
+                      source,
+                    },
+                  ],
+                },
+          },
+        });
+
         if (duplicateHistory) {
-          return prisma.tvWatchEntry.create({
-            data: {
+          await prisma.tvWatchHistory.updateMany({
+            where: {
               seriesTmdbId,
               seasonNumber,
               episodeNumber,
               userId,
-              latestWatchedAt: watchedAt,
-              source,
+              watchedAt,
             },
+            data: { tvWatchEntryId: watchEntry.id },
           });
         }
 
-        const [, watchEntry] = await prisma.$transaction([
-          prisma.tvWatchHistory.create({
-            data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
-          }),
-          prisma.tvWatchEntry.create({
-            data: {
-              seriesTmdbId,
-              seasonNumber,
-              episodeNumber,
-              userId,
-              latestWatchedAt: watchedAt,
-              source,
-            },
-          }),
-        ]);
         return watchEntry;
       }
 
       if (!duplicateHistory) {
         await prisma.tvWatchHistory.create({
-          data: { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
+          data: {
+            seriesTmdbId,
+            seasonNumber,
+            episodeNumber,
+            userId,
+            watchedAt,
+            source,
+            tvWatchEntryId: existing.id,
+          },
         });
       }
 

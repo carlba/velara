@@ -2,10 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
 import { prisma } from '../lib/prisma.js';
-import {
-  DEFAULT_WATCH_SOURCE,
-  type WatchSource,
-} from './watch-source.js';
+import { DEFAULT_WATCH_SOURCE, type WatchSource } from './watch-source.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
 
@@ -34,19 +31,21 @@ export function createWatchService(options?: ServiceOptions) {
       });
 
       if (!existing) {
-        const [, watchEntry] = await prisma.$transaction([
-          prisma.watchHistory.create({
-            data: { tmdbId, userId, watchedAt, source },
-          }),
-          prisma.watchEntry.create({
-            data: { tmdbId, userId, latestWatchedAt: watchedAt, source },
-          }),
-        ]);
-        return watchEntry;
+        return prisma.watchEntry.create({
+          data: {
+            tmdbId,
+            userId,
+            latestWatchedAt: watchedAt,
+            source,
+            watchHistory: {
+              create: [{ tmdbId, userId, watchedAt, source }],
+            },
+          },
+        });
       }
 
       await prisma.watchHistory.create({
-        data: { tmdbId, userId, watchedAt, source },
+        data: { tmdbId, userId, watchedAt, source, watchEntryId: existing.id },
       });
 
       if (watchedAt > existing.latestWatchedAt) {
@@ -74,16 +73,17 @@ export function createWatchService(options?: ServiceOptions) {
 
       if (existing) return existing;
 
-      const [, watchEntry] = await prisma.$transaction([
-        prisma.watchHistory.create({
-          data: { tmdbId, userId, watchedAt, source },
-        }),
-        prisma.watchEntry.create({
-          data: { tmdbId, userId, latestWatchedAt: watchedAt, source },
-        }),
-      ]);
-
-      return watchEntry;
+      return prisma.watchEntry.create({
+        data: {
+          tmdbId,
+          userId,
+          latestWatchedAt: watchedAt,
+          source,
+          watchHistory: {
+            create: [{ tmdbId, userId, watchedAt, source }],
+          },
+        },
+      });
     },
 
     async deleteWatchEntry(tmdbId: number, userId: number) {
