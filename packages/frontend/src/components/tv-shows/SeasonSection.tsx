@@ -3,11 +3,14 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import StarRating from '@/components/movies/StarRating';
 import EpisodeRow from './EpisodeRow';
+import { formatDateTime } from '@/lib/utils';
 import type { TvSeason, TvEpisode } from '@/types/tv-show';
 
 interface SeasonSectionProps {
   season: TvSeason;
   watchedEpisodeKeys: Set<string>;
+  latestWatchAt?: string | null;
+  episodeWatchAt: Map<string, string>;
   seasonRating: number | null;
   isAuthenticated: boolean;
   onToggleEpisode: (episode: TvEpisode) => void;
@@ -20,6 +23,8 @@ export default function SeasonSection({
   watchedEpisodeKeys,
   seasonRating,
   isAuthenticated,
+  latestWatchAt,
+  episodeWatchAt,
   onToggleEpisode,
   onSeasonRating,
   onClearSeasonRating,
@@ -30,6 +35,8 @@ export default function SeasonSection({
     watchedEpisodeKeys.has(`s${season.seasonNumber}e${ep.episodeNumber}`)
   ).length;
   const totalCount = season.episodes.length;
+
+  const latestWatchDate = latestWatchAt ? formatDateTime(latestWatchAt) : null;
 
   const handleSeasonRating = (score: number) => {
     if (seasonRating === score) {
@@ -55,7 +62,7 @@ export default function SeasonSection({
 
         <div className="flex-1 min-w-0">
           <p className="font-semibold leading-tight">{season.name}</p>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex flex-wrap items-center gap-2 mt-0.5">
             <Badge variant="secondary" className="text-xs">
               {watchedCount}/{totalCount} watched
             </Badge>
@@ -63,6 +70,9 @@ export default function SeasonSection({
               <span className="text-xs text-muted-foreground">
                 {new Date(season.airDate).getFullYear()}
               </span>
+            )}
+            {latestWatchDate && (
+              <span className="text-xs text-muted-foreground">Last watched {latestWatchDate}</span>
             )}
           </div>
         </div>
@@ -80,15 +90,19 @@ export default function SeasonSection({
 
       {isOpen && (
         <div className="border-t divide-y divide-border/50">
-          {season.episodes.map(episode => (
-            <EpisodeRow
-              key={episode.episodeNumber}
-              episode={episode}
-              isWatched={watchedEpisodeKeys.has(`s${season.seasonNumber}e${episode.episodeNumber}`)}
-              onToggleWatch={() => onToggleEpisode(episode)}
-              isAuthenticated={isAuthenticated}
-            />
-          ))}
+          {season.episodes.map(episode => {
+            const episodeKey = `s${season.seasonNumber}e${episode.episodeNumber}`;
+            return (
+              <EpisodeRow
+                key={episode.episodeNumber}
+                episode={episode}
+                isWatched={watchedEpisodeKeys.has(episodeKey)}
+                watchedAt={episodeWatchAt.get(episodeKey) ?? null}
+                onToggleWatch={() => onToggleEpisode(episode)}
+                isAuthenticated={isAuthenticated}
+              />
+            );
+          })}
         </div>
       )}
     </div>

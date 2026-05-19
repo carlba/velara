@@ -2,11 +2,13 @@ import { useId, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatDateTime } from '@/lib/utils';
 import type { TvEpisode } from '@/types/tv-show';
 
 interface EpisodeRowProps {
   episode: TvEpisode;
   isWatched: boolean;
+  watchedAt?: string | null;
   onToggleWatch: () => void;
   isAuthenticated: boolean;
 }
@@ -14,6 +16,7 @@ interface EpisodeRowProps {
 export default function EpisodeRow({
   episode,
   isWatched,
+  watchedAt,
   onToggleWatch,
   isAuthenticated,
 }: EpisodeRowProps) {
@@ -27,6 +30,7 @@ export default function EpisodeRow({
         year: 'numeric',
       }).format(new Date(episode.airDate))
     : null;
+  const formattedWatchedAt = watchedAt ? formatDateTime(watchedAt) : null;
 
   return (
     <div
@@ -44,12 +48,15 @@ export default function EpisodeRow({
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium leading-tight truncate">{episode.name}</p>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex flex-wrap items-center gap-2 mt-0.5">
             {airYear && <span className="text-xs text-muted-foreground">{airYear}</span>}
             {episode.runtime && (
               <Badge variant="outline" className="text-xs px-1.5 py-0 h-4">
                 {episode.runtime} min
               </Badge>
+            )}
+            {formattedWatchedAt && (
+              <span className="text-xs text-muted-foreground">Watched {formattedWatchedAt}</span>
             )}
           </div>
         </div>

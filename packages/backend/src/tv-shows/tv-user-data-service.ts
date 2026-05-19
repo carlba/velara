@@ -126,14 +126,18 @@ export function createTvUserDataService(options?: ServiceOptions) {
         prisma.tvReview.findUnique({ where: { seriesTmdbId_userId: { seriesTmdbId, userId } } }),
       ]);
 
-      const watchHistory = watchEntries.flatMap(entry =>
-        entry.watchHistory.map(history => ({
-          seasonNumber: entry.seasonNumber,
-          episodeNumber: entry.episodeNumber,
-          watchedAt: history.watchedAt,
-          source: history.source,
-        }))
-      );
+      const watchHistory = watchEntries
+        .flatMap(entry =>
+          entry.watchHistory.map(history => ({
+            seasonNumber: entry.seasonNumber,
+            episodeNumber: entry.episodeNumber,
+            watchedAt: history.watchedAt,
+            source: history.source,
+          }))
+        )
+        .sort((left, right) =>
+          left.watchedAt < right.watchedAt ? 1 : left.watchedAt > right.watchedAt ? -1 : 0
+        );
 
       const showRating = ratings.find(rating => rating.seasonNumber === 0);
       const seasonRatings = Object.fromEntries(

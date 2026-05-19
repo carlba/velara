@@ -38,6 +38,37 @@ export default function TvShowDetailsPage() {
     return new Set(userData.watchEntries.map(e => `s${e.seasonNumber}e${e.episodeNumber}`));
   }, [userData?.watchEntries]);
 
+  const latestSeasonWatchAt = useMemo(() => {
+    const seasonMap = new Map<number, string>();
+
+    if (!userData?.watchEntries) {
+      return seasonMap;
+    }
+
+    for (const entry of userData.watchEntries) {
+      const current = seasonMap.get(entry.seasonNumber);
+      if (!current || new Date(entry.watchedAt) > new Date(current)) {
+        seasonMap.set(entry.seasonNumber, entry.watchedAt);
+      }
+    }
+
+    return seasonMap;
+  }, [userData?.watchEntries]);
+
+  const episodeWatchAt = useMemo(() => {
+    const episodeMap = new Map<string, string>();
+
+    if (!userData?.watchEntries) {
+      return episodeMap;
+    }
+
+    for (const entry of userData.watchEntries) {
+      episodeMap.set(`s${entry.seasonNumber}e${entry.episodeNumber}`, entry.watchedAt);
+    }
+
+    return episodeMap;
+  }, [userData?.watchEntries]);
+
   if (showQuery.isLoading) {
     return <TvShowDetailSkeleton />;
   }
@@ -312,6 +343,8 @@ export default function TvShowDetailsPage() {
             seriesId={id}
             numberOfSeasons={show.numberOfSeasons}
             watchedKeys={watchedKeys}
+            latestSeasonWatchAt={latestSeasonWatchAt}
+            episodeWatchAt={episodeWatchAt}
             seasonRatings={seasonRatings}
             isAuthenticated={!!user}
             onEpisodeToggle={handleEpisodeToggle}
@@ -405,6 +438,8 @@ interface SeasonsListProps {
   seriesId: string;
   numberOfSeasons: number;
   watchedKeys: Set<string>;
+  latestSeasonWatchAt: Map<number, string>;
+  episodeWatchAt: Map<string, string>;
   seasonRatings: Record<number, number>;
   isAuthenticated: boolean;
   onEpisodeToggle: (seasonNumber: number, episode: TvEpisode) => void;
@@ -416,6 +451,8 @@ function SeasonsList({
   seriesId,
   numberOfSeasons,
   watchedKeys,
+  latestSeasonWatchAt,
+  episodeWatchAt,
   seasonRatings,
   isAuthenticated,
   onEpisodeToggle,
@@ -432,6 +469,8 @@ function SeasonsList({
           seriesId={seriesId}
           seasonNumber={n}
           watchedKeys={watchedKeys}
+          latestWatchAt={latestSeasonWatchAt.get(n) ?? null}
+          episodeWatchAt={episodeWatchAt}
           seasonRating={seasonRatings[n] ?? null}
           isAuthenticated={isAuthenticated}
           onEpisodeToggle={onEpisodeToggle}
@@ -447,6 +486,8 @@ interface SeasonLoaderProps {
   seriesId: string;
   seasonNumber: number;
   watchedKeys: Set<string>;
+  latestWatchAt: string | null;
+  episodeWatchAt: Map<string, string>;
   seasonRating: number | null;
   isAuthenticated: boolean;
   onEpisodeToggle: (seasonNumber: number, episode: TvEpisode) => void;
@@ -458,6 +499,8 @@ function SeasonLoader({
   seriesId,
   seasonNumber,
   watchedKeys,
+  latestWatchAt,
+  episodeWatchAt,
   seasonRating,
   isAuthenticated,
   onEpisodeToggle,
@@ -474,6 +517,8 @@ function SeasonLoader({
     <SeasonSection
       season={season}
       watchedEpisodeKeys={watchedKeys}
+      latestWatchAt={latestWatchAt}
+      episodeWatchAt={episodeWatchAt}
       seasonRating={seasonRating}
       isAuthenticated={isAuthenticated}
       onToggleEpisode={episode => onEpisodeToggle(seasonNumber, episode)}
