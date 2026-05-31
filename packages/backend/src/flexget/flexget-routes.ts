@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
 import { createFlexgetService } from './flexget-service.js';
 import { createListService } from '../lists/list-service.js';
+import { createTvShowService } from '../tv-shows/tv-show-service.js';
 
 const integrationBodySchema = z.object({
   baseUrl: z.string().url(),
@@ -61,6 +62,11 @@ export const flexgetRoutes: FastifyPluginCallbackZod = (fastify, _options, done)
     remoteListId: z.coerce.number().int().positive(),
   });
 
+  const setSeriesBeginBodySchema = z.object({
+    seasonNumber: z.number().int().min(1),
+    episodeNumber: z.number().int().min(1),
+  });
+
   fastify.post(
     '/import',
     { preHandler: authenticate, schema: { body: importFlexgetListBodySchema } },
@@ -71,6 +77,31 @@ export const flexgetRoutes: FastifyPluginCallbackZod = (fastify, _options, done)
         request.user.userId
       );
       return reply.code(201).send(list);
+    }
+  );
+
+  fastify.post(
+    '/series/:seriesId/begin',
+    {
+      preHandler: authenticate,
+      schema: {
+        params: z.object({ seriesId: z.string().min(1) }),
+        body: setSeriesBeginBodySchema,
+      },
+    },
+    async (request, reply) => {
+      const integration = await flexgetService.ensureIntegration(request.user.userId);
+      const tvService = createTvShowService({ logger: request.log });
+      const show = await tvService.getTvShowDetails(request.params.seriesId);
+
+      await flexgetService.setSeriesBegin(
+        integration,
+        show.name,
+        request.body.seasonNumber,
+        request.body.episodeNumber
+      );
+
+      return reply.code(204).send();
     }
   );
 

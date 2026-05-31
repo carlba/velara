@@ -39,7 +39,7 @@ function buildItemMetadata(item: ListItem): Promise<ListItemMetadata> {
           : 'TV series',
         description: show.overview,
         imagePath: show.posterPath,
-        link: `/tv/${show.seriesTmdbId}`,
+        link: `/tv/${show.seriesTmdbId}?list=true`,
       }));
     case 'season':
       return fetchTvSeason(item.seriesTmdbId!, item.seasonNumber!).then((season: TvSeason) => ({
@@ -47,7 +47,7 @@ function buildItemMetadata(item: ListItem): Promise<ListItemMetadata> {
         subtitle: `Season ${season.seasonNumber}`,
         description: season.overview,
         imagePath: season.posterPath,
-        link: `/tv/${item.seriesTmdbId}`,
+        link: `/tv/${item.seriesTmdbId}?list=true`,
       }));
     case 'episode':
       return fetchTvSeason(item.seriesTmdbId!, item.seasonNumber!).then((season: TvSeason) => {
@@ -57,7 +57,7 @@ function buildItemMetadata(item: ListItem): Promise<ListItemMetadata> {
           subtitle: `Season ${season.seasonNumber}${episode ? ` • Episode ${episode.episodeNumber}` : ''}`,
           description: episode?.overview ?? season.overview,
           imagePath: episode?.stillPath ?? season.posterPath,
-          link: `/tv/${item.seriesTmdbId}`,
+          link: `/tv/${item.seriesTmdbId}?list=true`,
         };
       });
     default:

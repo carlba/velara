@@ -135,6 +135,28 @@ export function createFlexgetService(options?: ServiceOptions) {
     return lists.find(list => list.name === name) ?? null;
   }
 
+  async function findSeriesByName(
+    integration: FlexgetIntegrationRecord,
+    name: string
+  ): Promise<{ id: number; name: string }[]> {
+    const logger = localLogger('findSeriesByName');
+    const client = await authenticateClient(integration);
+
+    const response = await client.get(`series/search/${encodeURIComponent(name)}/`, {
+      searchParams: { begin: false, latest: false },
+    });
+
+    if (response.statusCode !== 200) {
+      logger.error(
+        { statusCode: response.statusCode, body: response.body, name },
+        'Failed to search Flexget series by name'
+      );
+      throw new HttpError('Failed to search Flexget series', { statusCode: 502 });
+    }
+
+    return response.body as unknown as { id: number; name: string }[];
+  }
+
   async function createRemoteEntryList(
     integration: FlexgetIntegrationRecord,
     name: string
@@ -220,6 +242,72 @@ export function createFlexgetService(options?: ServiceOptions) {
     }
   }
 
+  async function setSeriesBegin(
+    integration: FlexgetIntegrationRecord,
+    showName: string,
+    seasonNumber: number,
+    episodeNumber: number
+  ) {
+    const logger = localLogger('setSeriesBegin');
+    const client = await authenticateClient(integration);
+    const beginEpisode = `S${String(seasonNumber).padStart(2, '0')}E${String(
+      episodeNumber
+    ).padStart(2, '0')}`;
+
+    const response = await client.post('series/', {
+      json: {
+        name: showName,
+        begin_episode: beginEpisode,
+      },
+    });
+
+    if (response.statusCode === 409) {
+      const foundSeries = await findSeriesByName(integration, showName);
+      const existing = foundSeries.find(series => series.name === showName) ?? foundSeries[0];
+
+      if (!existing) {
+        throw new HttpError('Flexget series exists but could not be resolved', {
+          statusCode: 502,
+        });
+      }
+
+      const updateResponse = await client.put(`series/${existing.id}/`, {
+        json: { begin_episode: beginEpisode },
+      });
+
+      if (![200, 201].includes(updateResponse.statusCode)) {
+        logger.error(
+          {
+            statusCode: updateResponse.statusCode,
+            body: updateResponse.body,
+            showId: existing.id,
+            beginEpisode,
+          },
+          'Failed to update existing Flexget series begin'
+        );
+        if (updateResponse.statusCode === 404) {
+          throw new HttpError('Flexget show not found', { statusCode: 404 });
+        }
+        throw new HttpError('Failed to update Flexget series begin', { statusCode: 502 });
+      }
+
+      return updateResponse.body;
+    }
+
+    if (![200, 201].includes(response.statusCode)) {
+      logger.error(
+        { statusCode: response.statusCode, body: response.body, showName, beginEpisode },
+        'Failed to set series begin in Flexget'
+      );
+      if (response.statusCode === 404) {
+        throw new HttpError('Flexget show not found', { statusCode: 404 });
+      }
+      throw new HttpError('Failed to update Flexget series begin', { statusCode: 502 });
+    }
+
+    return response.body;
+  }
+
   async function getIntegration(userId: number) {
     const logger = localLogger('getIntegration');
     logger.debug({ userId }, 'Fetching Flexget integration config');
@@ -271,5 +359,6 @@ export function createFlexgetService(options?: ServiceOptions) {
     getRemoteEntryListEntries,
     pushEntryToRemoteList,
     deleteEntryFromRemoteList,
+    setSeriesBegin,
   };
 }

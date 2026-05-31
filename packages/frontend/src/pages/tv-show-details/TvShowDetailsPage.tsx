@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, ExternalLink, Trash2, Tv } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import StarRating from '@/components/movies/StarRating';
 import ListActionPanel from '@/components/lists/ListActionPanel';
 import SeasonSection from '@/components/tv-shows/SeasonSection';
+import { setSeriesBegin } from '@/services/flexget-api';
 import { useTvShowDetails } from '@/hooks/useTvShowDetails';
 import { useTvComments } from '@/hooks/useTvComments';
 import { useUserTvData } from '@/hooks/useUserTvData';
@@ -21,11 +23,34 @@ export default function TvShowDetailsPage() {
   const { seriesId } = useParams<{ seriesId: string }>();
   const id = seriesId ?? '';
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const isListShow = searchParams.get('list') === 'true';
   const { showQuery, userDataQuery } = useTvShowDetails(id);
   const { commentsQuery, addComment, removeComment } = useTvComments(id);
   const mutations = useUserTvData(id);
   const [reviewText, setReviewText] = useState<string | undefined>(undefined);
   const [commentText, setCommentText] = useState('');
+  const [beginError, setBeginError] = useState<string | null>(null);
+
+  const setSeriesBeginMutation = useMutation<
+    void,
+    Error,
+    { seasonNumber: number; episodeNumber: number }
+  >({
+    mutationFn: ({ seasonNumber, episodeNumber }) =>
+      setSeriesBegin(id, seasonNumber, episodeNumber),
+    onError: error => {
+      setBeginError(error.message || 'Failed to set the series begin episode.');
+    },
+    onSuccess: () => {
+      setBeginError(null);
+    },
+  });
+
+  const handleSetSeriesBegin = (seasonNumber: number, episodeNumber: number) => {
+    setBeginError(null);
+    setSeriesBeginMutation.mutate({ seasonNumber, episodeNumber });
+  };
 
   const show = showQuery.data;
   const userData = userDataQuery.data;
@@ -335,6 +360,12 @@ export default function TvShowDetailsPage() {
 
       <Separator />
 
+      {beginError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {beginError}
+        </div>
+      ) : null}
+
       {/* Seasons */}
       {show.numberOfSeasons && show.numberOfSeasons > 0 && (
         <div className="space-y-4">
@@ -347,7 +378,10 @@ export default function TvShowDetailsPage() {
             episodeWatchAt={episodeWatchAt}
             seasonRatings={seasonRatings}
             isAuthenticated={!!user}
+            isListShow={isListShow}
+            isBeginPending={setSeriesBeginMutation.isPending}
             onEpisodeToggle={handleEpisodeToggle}
+            onSetBegin={handleSetSeriesBegin}
             onSeasonRating={(seasonNumber, score) =>
               mutations.setSeasonRating.mutate({ seasonNumber, score })
             }
@@ -442,7 +476,10 @@ interface SeasonsListProps {
   episodeWatchAt: Map<string, string>;
   seasonRatings: Record<number, number>;
   isAuthenticated: boolean;
+  isListShow: boolean;
+  isBeginPending: boolean;
   onEpisodeToggle: (seasonNumber: number, episode: TvEpisode) => void;
+  onSetBegin: (seasonNumber: number, episodeNumber: number) => void;
   onSeasonRating: (seasonNumber: number, score: number) => void;
   onClearSeasonRating: (seasonNumber: number) => void;
 }
@@ -455,7 +492,10 @@ function SeasonsList({
   episodeWatchAt,
   seasonRatings,
   isAuthenticated,
+  isListShow,
+  isBeginPending,
   onEpisodeToggle,
+  onSetBegin,
   onSeasonRating,
   onClearSeasonRating,
 }: SeasonsListProps) {
@@ -473,7 +513,10 @@ function SeasonsList({
           episodeWatchAt={episodeWatchAt}
           seasonRating={seasonRatings[n] ?? null}
           isAuthenticated={isAuthenticated}
+          isListShow={isListShow}
+          isBeginPending={isBeginPending}
           onEpisodeToggle={onEpisodeToggle}
+          onSetBegin={onSetBegin}
           onSeasonRating={onSeasonRating}
           onClearSeasonRating={onClearSeasonRating}
         />
@@ -490,7 +533,10 @@ interface SeasonLoaderProps {
   episodeWatchAt: Map<string, string>;
   seasonRating: number | null;
   isAuthenticated: boolean;
+  isListShow: boolean;
+  isBeginPending: boolean;
   onEpisodeToggle: (seasonNumber: number, episode: TvEpisode) => void;
+  onSetBegin: (seasonNumber: number, episodeNumber: number) => void;
   onSeasonRating: (seasonNumber: number, score: number) => void;
   onClearSeasonRating: (seasonNumber: number) => void;
 }
@@ -503,7 +549,10 @@ function SeasonLoader({
   episodeWatchAt,
   seasonRating,
   isAuthenticated,
+  isListShow,
+  isBeginPending,
   onEpisodeToggle,
+  onSetBegin,
   onSeasonRating,
   onClearSeasonRating,
 }: SeasonLoaderProps) {
@@ -521,7 +570,10 @@ function SeasonLoader({
       episodeWatchAt={episodeWatchAt}
       seasonRating={seasonRating}
       isAuthenticated={isAuthenticated}
+      isListShow={isListShow}
+      isBeginPending={isBeginPending}
       onToggleEpisode={episode => onEpisodeToggle(seasonNumber, episode)}
+      onSetBegin={episode => onSetBegin(seasonNumber, episode.episodeNumber)}
       onSeasonRating={onSeasonRating}
       onClearSeasonRating={onClearSeasonRating}
     />

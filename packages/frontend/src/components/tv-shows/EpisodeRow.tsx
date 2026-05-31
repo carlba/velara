@@ -1,5 +1,5 @@
-import { useId, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { useId, useState, type MouseEvent } from 'react';
+import { Eye, EyeOff, PlayCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/utils';
@@ -10,7 +10,10 @@ interface EpisodeRowProps {
   isWatched: boolean;
   watchedAt?: string | null;
   onToggleWatch: () => void;
+  onSetBegin?: () => void;
+  isBeginPending: boolean;
   isAuthenticated: boolean;
+  isListShow: boolean;
 }
 
 export default function EpisodeRow({
@@ -18,7 +21,10 @@ export default function EpisodeRow({
   isWatched,
   watchedAt,
   onToggleWatch,
+  onSetBegin,
+  isBeginPending,
   isAuthenticated,
+  isListShow,
 }: EpisodeRowProps) {
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const tooltipId = useId();
@@ -31,6 +37,11 @@ export default function EpisodeRow({
       }).format(new Date(episode.airDate))
     : null;
   const formattedWatchedAt = watchedAt ? formatDateTime(watchedAt) : null;
+
+  const handleBeginClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onSetBegin?.();
+  };
 
   return (
     <div
@@ -60,6 +71,18 @@ export default function EpisodeRow({
             )}
           </div>
         </div>
+
+        {isAuthenticated && isListShow && !isWatched && onSetBegin && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBeginClick}
+            disabled={isBeginPending}
+            className="shrink-0 h-7 w-7 p-0">
+            <PlayCircle className="h-3.5 w-3.5" />
+            <span className="sr-only">Set begin from this episode</span>
+          </Button>
+        )}
 
         {isAuthenticated && (
           <Button

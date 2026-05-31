@@ -56,6 +56,17 @@ export async function importFlexgetRemoteList(remoteListId: number): Promise<Lis
   });
 }
 
+export async function setSeriesBegin(
+  seriesId: string,
+  seasonNumber: number,
+  episodeNumber: number
+): Promise<void> {
+  return apiRequest<void>(`/api/flexget/series/${seriesId}/begin`, {
+    method: 'POST',
+    body: JSON.stringify({ seasonNumber, episodeNumber }),
+  });
+}
+
 export async function connectListToFlexget(
   listId: number,
   entryListName: string
