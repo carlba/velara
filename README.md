@@ -70,6 +70,12 @@ npm run db:restore
 
 The dump file is written to `packages/backend/db/velara.sql`.
 
+## Development
+
+### Flexget
+
+The flexget API documentation can be found at `http://localhost:5050/api/`
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if present.

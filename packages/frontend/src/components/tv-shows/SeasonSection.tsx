@@ -13,7 +13,10 @@ interface SeasonSectionProps {
   episodeWatchAt: Map<string, string>;
   seasonRating: number | null;
   isAuthenticated: boolean;
+  isListShow: boolean;
+  isBeginPending: boolean;
   onToggleEpisode: (episode: TvEpisode) => void;
+  onSetBegin: (episode: TvEpisode) => void;
   onSeasonRating: (seasonNumber: number, score: number) => void;
   onClearSeasonRating: (seasonNumber: number) => void;
 }
@@ -23,9 +26,12 @@ export default function SeasonSection({
   watchedEpisodeKeys,
   seasonRating,
   isAuthenticated,
+  isListShow,
+  isBeginPending,
   latestWatchAt,
   episodeWatchAt,
   onToggleEpisode,
+  onSetBegin,
   onSeasonRating,
   onClearSeasonRating,
 }: SeasonSectionProps) {
@@ -99,6 +105,9 @@ export default function SeasonSection({
                 isWatched={watchedEpisodeKeys.has(episodeKey)}
                 watchedAt={episodeWatchAt.get(episodeKey) ?? null}
                 onToggleWatch={() => onToggleEpisode(episode)}
+                onSetBegin={() => onSetBegin(episode)}
+                isListShow={isListShow}
+                isBeginPending={isBeginPending}
                 isAuthenticated={isAuthenticated}
               />
             );
