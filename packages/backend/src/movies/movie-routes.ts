@@ -1,8 +1,6 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
-import { HTTPError } from 'got';
 import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
-import { HttpError } from '../lib/http-error.js';
 import { createMovieService } from './movie-service.js';
 import { createUserDataService } from './user-data-service.js';
 import { createWatchService } from '../watch/watch-service.js';
@@ -56,13 +54,6 @@ const importBodySchema = z.object({
   type: z.enum(['ratings', 'comments']).default('ratings'),
 });
 
-function handleNotFound(error: unknown): never {
-  if (error instanceof HTTPError && error.response.statusCode === 404) {
-    throw new HttpError('Movie not found', { statusCode: 404, cause: error });
-  }
-  throw error;
-}
-
 const SORT_REQUIRED_FILTER: Partial<Record<SortBy, UserFilterValue>> = {
   watched_date: 'watched',
   my_rating: 'rated',
@@ -81,7 +72,7 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
 
     if (tmdb_id !== undefined) {
       const movieService = createMovieService({ logger: request.log });
-      const movie = await movieService.getMovieById(tmdb_id).catch(handleNotFound);
+      const movie = await movieService.getMovieById(tmdb_id);
       return reply.send({ results: [movie], page: 1, total_pages: 1, total_results: 1 });
     }
 
@@ -124,7 +115,7 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
 
   fastify.get('/:tmdbId', { schema: { params: paramsSchema } }, async (request, reply) => {
     const movieService = createMovieService({ logger: request.log });
-    const movie = await movieService.getMovieDetails(request.params.tmdbId).catch(handleNotFound);
+    const movie = await movieService.getMovieDetails(request.params.tmdbId);
     return reply.send(movie);
   });
 
