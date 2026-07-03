@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node --env-file-if-exists='.env' dist/index.js",
-    "start:dev": "tsx --env-file-if-exists=.env --watch src/index.ts",
+    "start:dev": "tsx --env-file-if-exists=.env --watch src/index.ts | pino-pretty",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
