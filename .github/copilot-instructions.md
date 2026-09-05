@@ -157,6 +157,10 @@ async function fetchUser(userId: string): Promise<User> {
   ensure that these still capture the stacktrace.
 - Keep architecture simple and modular; avoid heavy abstractions unless clearly required.
 - Write small, focused route handlers and move business logic into separate services.
+- The services should handle errors and convert them into resonable HttpErrors that will in turn be
+  handled by global error handling.
+- If a service is not related to request processing at all then custom service specific errors
+  should be used.
 - Do not introduce NestJS, Express, or other frameworks unless explicitly requested or already in
   use.
 - Favor clear types, explicit interfaces, and predictable module boundaries.

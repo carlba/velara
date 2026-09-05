@@ -13,6 +13,7 @@ import type {
   MovieDetail,
   SortBy,
 } from './movie-types.js';
+import { HttpError } from '../lib/http-error.js';
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/w1280';
@@ -68,7 +69,10 @@ export function createMovieService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ query, page, err: error }, 'TMDB search failed');
       if (error instanceof HTTPError) {
-        throw new Error(`TMDB search failed: ${error.response.statusCode}`, { cause: error });
+        throw new HttpError('TMDB search failed', {
+          statusCode: error.response.statusCode,
+          cause: error,
+        });
       }
       throw error;
     }
@@ -99,7 +103,10 @@ export function createMovieService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ sortBy, page, err: error }, 'TMDB discover failed');
       if (error instanceof HTTPError) {
-        throw new Error(`TMDB discover failed: ${error.response.statusCode}`, { cause: error });
+        throw new HttpError('TMDB discover failed', {
+          statusCode: error.response.statusCode,
+          cause: error,
+        });
       }
       throw error;
     }
@@ -114,7 +121,10 @@ export function createMovieService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ tmdbId, err: error }, 'TMDB request failed');
       if (error instanceof HTTPError) {
-        throw new Error(`TMDB request failed: ${error.response.statusCode}`, { cause: error });
+        throw new HttpError('TMDB request failed', {
+          statusCode: error.response.statusCode,
+          cause: error,
+        });
       }
       throw error;
     }
@@ -160,7 +170,10 @@ export function createMovieService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ imdbId, err: error }, 'TMDB lookup by IMDB id failed');
       if (error instanceof HTTPError) {
-        throw new Error(`TMDB lookup failed: ${error.response.statusCode}`, { cause: error });
+        throw new HttpError('TMDB lookup failed', {
+          statusCode: error.response.statusCode,
+          cause: error,
+        });
       }
       throw error;
     }
@@ -205,7 +218,10 @@ export function createMovieService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ tmdbId, err: error }, 'TMDB request failed');
       if (error instanceof HTTPError) {
-        throw new Error(`TMDB request failed: ${error.response.statusCode}`, { cause: error });
+        throw new HttpError('TMDB request failed', {
+          statusCode: error.response.statusCode,
+          cause: error,
+        });
       }
       throw error;
     }

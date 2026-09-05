@@ -50,6 +50,7 @@ export default function MovieDetailsPage() {
 
   const isWatched = !!userData?.watchEntry;
   const userRating = userData?.rating?.score ?? null;
+  const displayedRating = userRating !== null ? userRating / 2 : null;
 
   const handleWatchToggle = () => {
     if (isWatched) {
@@ -60,10 +61,11 @@ export default function MovieDetailsPage() {
   };
 
   const handleRating = (score: number) => {
-    if (userRating === score) {
+    const rating = Math.round(score * 2);
+    if (userRating === rating) {
       mutations.clearRating.mutate();
     } else {
-      mutations.setRating.mutate(score);
+      mutations.setRating.mutate(rating);
     }
   };
 
@@ -242,7 +244,7 @@ export default function MovieDetailsPage() {
           <div className="space-y-2">
             <p className="text-sm font-medium">Your Rating</p>
             <div className="flex items-center gap-3">
-              <StarRating value={userRating} onChange={handleRating} size="lg" />
+              <StarRating value={displayedRating} onChange={handleRating} size="lg" />
               {userRating && (
                 <Button
                   variant="ghost"

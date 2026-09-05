@@ -1,8 +1,6 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
-import { HTTPError } from 'got';
 import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
-import { HttpError } from '../lib/http-error.js';
 import { importTvFromTrakt } from '../movies/import-service.js';
 import { createTvShowService } from './tv-show-service.js';
 import { createTvUserDataService } from './tv-user-data-service.js';
@@ -46,7 +44,7 @@ const unwatchBodySchema = z.object({
 });
 
 const ratingBodySchema = z.object({
-  score: z.number().int().min(1).max(5),
+  score: z.number().int().min(1).max(10),
 });
 
 const reviewBodySchema = z.object({
@@ -61,13 +59,6 @@ const deleteCommentParamsSchema = z.object({
   seriesId: z.string().min(1),
   commentId: z.coerce.number().int().positive(),
 });
-
-function handleNotFound(error: unknown): never {
-  if (error instanceof HTTPError && error.response.statusCode === 404) {
-    throw new HttpError('TV show not found', { statusCode: 404, cause: error });
-  }
-  throw error;
-}
 
 const SORT_REQUIRED_FILTER: Partial<Record<TvSortBy, TvUserFilterValue>> = {
   watched_date: 'watched',
@@ -102,7 +93,7 @@ export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
 
     if (series_id !== undefined) {
       const tvService = createTvShowService({ logger: request.log });
-      const show = await tvService.getTvShowById(series_id).catch(handleNotFound);
+      const show = await tvService.getTvShowById(series_id);
       return reply.send({ results: [show], page: 1, total_pages: 1, total_results: 1 });
     }
 
@@ -145,7 +136,7 @@ export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
 
   fastify.get('/:seriesId', { schema: { params: seriesParamsSchema } }, async (request, reply) => {
     const tvService = createTvShowService({ logger: request.log });
-    const show = await tvService.getTvShowDetails(request.params.seriesId).catch(handleNotFound);
+    const show = await tvService.getTvShowDetails(request.params.seriesId);
     return reply.send(show);
   });
 
@@ -154,9 +145,10 @@ export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
     { schema: { params: seriesSeasonParamsSchema } },
     async (request, reply) => {
       const tvService = createTvShowService({ logger: request.log });
-      const season = await tvService
-        .getTvSeason(request.params.seriesId, request.params.seasonNumber)
-        .catch(handleNotFound);
+      const season = await tvService.getTvSeason(
+        request.params.seriesId,
+        request.params.seasonNumber
+      );
       return reply.send(season);
     }
   );

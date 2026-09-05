@@ -44,11 +44,14 @@ export default function SeasonSection({
 
   const latestWatchDate = latestWatchAt ? formatDateTime(latestWatchAt) : null;
 
+  const displayedRating = seasonRating !== null ? seasonRating / 2 : null;
+
   const handleSeasonRating = (score: number) => {
-    if (seasonRating === score) {
+    const rating = Math.round(score * 2);
+    if (seasonRating === rating) {
       onClearSeasonRating(season.seasonNumber);
     } else {
-      onSeasonRating(season.seasonNumber, score);
+      onSeasonRating(season.seasonNumber, rating);
     }
   };
 
@@ -85,7 +88,7 @@ export default function SeasonSection({
 
         {isAuthenticated && (
           <div onClick={e => e.stopPropagation()}>
-            <StarRating value={seasonRating} onChange={handleSeasonRating} size="sm" />
+            <StarRating value={displayedRating} onChange={handleSeasonRating} size="sm" />
           </div>
         )}
 

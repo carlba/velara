@@ -113,13 +113,15 @@ export default function TvShowDetailsPage() {
   }
 
   const userShowRating = userData?.showRating?.score ?? null;
+  const displayedShowRating = userShowRating !== null ? userShowRating / 2 : null;
   const seasonRatings = userData?.seasonRatings ?? {};
 
   const handleShowRating = (score: number) => {
-    if (userShowRating === score) {
+    const rating = Math.round(score * 2);
+    if (userShowRating === rating) {
       mutations.clearShowRating.mutate();
     } else {
-      mutations.setShowRating.mutate(score);
+      mutations.setShowRating.mutate(rating);
     }
   };
 
@@ -270,7 +272,7 @@ export default function TvShowDetailsPage() {
           <div className="space-y-2">
             <p className="text-sm font-medium">Your Rating</p>
             <div className="flex items-center gap-3">
-              <StarRating value={userShowRating} onChange={handleShowRating} size="lg" />
+              <StarRating value={displayedShowRating} onChange={handleShowRating} size="lg" />
               {userShowRating && (
                 <Button
                   variant="ghost"

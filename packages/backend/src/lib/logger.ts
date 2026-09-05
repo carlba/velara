@@ -46,22 +46,8 @@ export function createLogger(
   environment: 'development' | 'production' | 'test' = 'development',
   pinoLoggerOptions: pino.LoggerOptions = {}
 ) {
-  const transport =
-    environment === 'development'
-      ? {
-          targets: [
-            {
-              target: 'pino-pretty',
-              options: { colorize: true, ignore: 'pid,hostname,context,module' },
-              level: 'debug',
-            },
-          ],
-        }
-      : undefined;
-
   const loggerOptions: pino.LoggerOptions = {
     level: environment === 'development' ? 'debug' : 'info',
-    transport,
     hooks: {
       logMethod(args, method) {
         const name = getNameFromBindings.call(this, nameParts);

@@ -2,6 +2,7 @@ import { HTTPError } from 'got';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Logger } from 'pino';
 import { LOGGER } from '../registry.js';
+import { HttpError } from '../lib/http-error.js';
 import { tmdbClient } from '../movies/tmdb-client.js';
 import { omdbClient } from '../movies/omdb-client.js';
 import type {
@@ -130,6 +131,12 @@ export function createTvShowService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ seriesTmdbId, err: error }, 'TMDB TV request failed');
       if (error instanceof HTTPError) {
+        if (error.response.statusCode === 404) {
+          throw new HttpError('TV show not found', {
+            statusCode: 404,
+            cause: error,
+          });
+        }
         throw new Error(`TMDB TV request failed: ${error.response.statusCode}`, { cause: error });
       }
       throw error;
@@ -185,6 +192,12 @@ export function createTvShowService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ seriesTmdbId, err: error }, 'TMDB TV details request failed');
       if (error instanceof HTTPError) {
+        if (error.response.statusCode === 404) {
+          throw new HttpError('TV show not found', {
+            statusCode: 404,
+            cause: error,
+          });
+        }
         throw new Error(`TMDB TV details failed: ${error.response.statusCode}`, { cause: error });
       }
       throw error;
@@ -219,6 +232,12 @@ export function createTvShowService(options?: ServiceOptions) {
     } catch (error) {
       logger.error({ seriesTmdbId, seasonNumber, err: error }, 'TMDB TV season request failed');
       if (error instanceof HTTPError) {
+        if (error.response.statusCode === 404) {
+          throw new HttpError('TV show not found', {
+            statusCode: 404,
+            cause: error,
+          });
+        }
         throw new Error(`TMDB TV season failed: ${error.response.statusCode}`, { cause: error });
       }
       throw error;
