@@ -243,7 +243,7 @@ describe('Trakt import service', () => {
     expect(upsertRatingMock).toHaveBeenCalledWith(
       456,
       2,
-      4,
+      8,
       expect.any(Date),
       expect.any(Date),
       'filmtipset.ratings'

@@ -32,7 +32,7 @@ const watchBodySchema = z.object({
 });
 
 const ratingBodySchema = z.object({
-  score: z.number().int().min(1).max(5),
+  score: z.number().int().min(1).max(10),
 });
 
 const reviewBodySchema = z.object({

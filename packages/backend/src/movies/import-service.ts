@@ -565,7 +565,7 @@ export async function importFromFilmtipset(
         await ratingService.upsertRating(
           lookupResult.tmdbId,
           userId,
-          row.score,
+          row.score * 2,
           row.watchedAt,
           importTimestamp,
           FILMTIPSET_SOURCE_RATINGS
