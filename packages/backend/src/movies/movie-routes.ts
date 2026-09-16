@@ -8,6 +8,7 @@ import { createRatingService } from '../ratings/rating-service.js';
 import { createReviewService } from '../reviews/review-service.js';
 import { createCommentService } from '../comments/comment-service.js';
 import { importFromFilmtipset, importFromTraktDump } from './import-service.js';
+import { createExportService } from './export-service.js';
 import { USER_FILTER_VALUES } from './movie-types.js';
 import type { SortBy, UserFilterValue } from './movie-types.js';
 
@@ -111,6 +112,15 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     const movieService = createMovieService({ logger: request.log });
     const data = await movieService.discoverMovies(sort_by, page);
     return reply.send(data);
+  });
+
+  fastify.get('/export/letterboxd', { preHandler: authenticate }, async (request, reply) => {
+    const exportService = createExportService({ logger: request.log });
+    const csv = await exportService.exportLetterboxdCsv(request.user.userId);
+    return reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', 'attachment; filename="letterboxd-export.csv"')
+      .send(csv);
   });
 
   fastify.get('/:tmdbId', { schema: { params: paramsSchema } }, async (request, reply) => {

@@ -20,7 +20,12 @@ import {
   saveFlexgetIntegration,
   type FlexgetIntegration,
 } from '@/services/flexget-api';
-import { importMovies, type ImportProvider, type ImportSummary } from '@/services/user-data-api';
+import {
+  getLetterboxdExportUrl,
+  importMovies,
+  type ImportProvider,
+  type ImportSummary,
+} from '@/services/user-data-api';
 import {
   deleteTraktIntegration,
   fetchTraktAuthUrl,
@@ -415,6 +420,21 @@ export default function ProfilePage() {
             <p>Trakt will redirect back to:</p>
             <p className="font-mono break-all">{window.location.origin}/trakt-callback</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Export to Letterboxd</CardTitle>
+          <CardDescription>
+            Download your watch history and ratings as a Letterboxd-compatible CSV, ready to
+            import at letterboxd.com/import.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => (window.location.href = getLetterboxdExportUrl())}>
+            Export to Letterboxd
+          </Button>
         </CardContent>
       </Card>
 

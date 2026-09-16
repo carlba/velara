@@ -1,4 +1,4 @@
-import { apiRequest } from './api-client';
+import { apiRequest, BASE_URL } from './api-client';
 import type { UserMovieData } from '@/types/movie';
 
 export type ImportProvider = 'filmtipset' | 'trakt';
@@ -71,4 +71,8 @@ export async function importTrakt(content: string): Promise<ImportSummary> {
 
 export async function importRatings(content: string): Promise<ImportSummary> {
   return importFilmtipset(content, 'ratings');
+}
+
+export function getLetterboxdExportUrl(): string {
+  return `${BASE_URL}/api/movies/export/letterboxd`;
 }
