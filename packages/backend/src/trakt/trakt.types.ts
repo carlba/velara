@@ -164,13 +164,13 @@ export interface TraktList {
 
 export interface TraktMovie {
   title: string;
-  year: number;
+  year?: number | null;
   ids: TraktIds;
 }
 
 export interface TraktShow {
   title: string;
-  year: number;
+  year?: number | null;
   ids: TraktIds;
   aired_episodes?: number;
 }
@@ -297,7 +297,7 @@ export type TraktWatchedEntry = TraktWatchedMovie | TraktWatchedShow;
 export interface TraktHistoryMovie {
   id: number;
   watched_at: string;
-  action: 'watch' | 'scrobble';
+  action: 'watch' | 'scrobble' | 'checkin';
   type: 'movie';
   movie: TraktMovie;
 }
@@ -305,7 +305,7 @@ export interface TraktHistoryMovie {
 export interface TraktHistoryEpisode {
   id: number;
   watched_at: string;
-  action: 'watch' | 'scrobble';
+  action: 'watch' | 'scrobble' | 'checkin';
   type: 'episode';
   episode: TraktEpisode;
   show: TraktShow;

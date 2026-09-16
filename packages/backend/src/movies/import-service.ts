@@ -16,6 +16,9 @@ import type {
   TraktHistoryEntry,
 } from '../trakt/trakt.types.js';
 import { WatchSource } from '../watch/watch-source.js';
+import { parseTraktDump, TraktDumpParseError } from '../trakt/trakt-dump-service.js';
+
+type TraktDumpData = Pick<TraktExport, 'ratings' | 'history'>;
 
 const TRAKT_SOURCE = WatchSource.Trakt;
 const FILMTIPSET_SOURCE_COMMENTS = WatchSource.FilmtipsetComments;
@@ -211,7 +214,7 @@ async function resolveTraktMovieTmdbId(
 
 async function importFromTraktExport(
   userId: number,
-  traktExport: TraktExport,
+  traktExport: TraktDumpData,
   options: ServiceOptions
 ): Promise<ImportSummary> {
   const serviceLogger = options.logger ?? LOGGER;
@@ -390,138 +393,37 @@ async function importFromTraktExport(
   return { importedCount, skippedCount, errors };
 }
 
-async function importTvFromTraktExport(
-  userId: number,
-  traktExport: TraktExport,
-  options: ServiceOptions
-): Promise<ImportSummary> {
-  const serviceLogger = options.logger ?? LOGGER;
-  const logger = serviceLogger.child({ module: 'import-service', source: TRAKT_SOURCE });
-  const tvRatingService = createTvRatingService({ logger });
-  const tvWatchService = createTvWatchService({ logger });
-  const importTimestamp = new Date();
-  const errors: string[] = [];
-  let importedCount = 0;
-  let skippedCount = 0;
+function decodeTraktDump(
+  zipBase64: string,
+  logger: Pick<Logger, 'error'>
+): { success: true; data: TraktDumpData } | { success: false; errors: string[] } {
+  const buffer = Buffer.from(zipBase64, 'base64');
 
-  const tvRatingRows = traktExport.ratings
-    .filter((entry): entry is TraktShowRatingEntry => entry.type === 'show')
-    .filter(entry => typeof entry.show.ids?.tmdb === 'number');
-
-  for (const entry of tvRatingRows) {
-    const seriesTmdbId = String(entry.show.ids.tmdb!);
-    const ratedAt = new Date(entry.rated_at);
-    if (Number.isNaN(ratedAt.getTime())) {
-      errors.push(`TV rating import skipped: invalid date for series ${seriesTmdbId}`);
-      skippedCount += 1;
-      continue;
+  try {
+    return { success: true, data: parseTraktDump(buffer) };
+  } catch (error) {
+    if (error instanceof TraktDumpParseError) {
+      logger.error({ err: error }, 'Failed to parse Trakt data dump zip');
+      return { success: false, errors: [error.message] };
     }
-    try {
-      await tvRatingService.upsertTvRating(
-        seriesTmdbId,
-        0,
-        userId,
-        entry.rating,
-        ratedAt,
-        importTimestamp,
-        TRAKT_SOURCE
-      );
-      importedCount += 1;
-    } catch (error) {
-      logger.error({ err: error, entry }, 'Failed to import Trakt TV rating');
-      errors.push('TV rating import failed');
-      skippedCount += 1;
-    }
+    throw error;
   }
-
-  const episodeHistoryRows = traktExport.history
-    .filter((entry): entry is TraktEpisodeHistoryEntry => entry.type === 'episode')
-    .filter(entry => typeof entry.show.ids?.tmdb === 'number');
-
-  for (const entry of episodeHistoryRows) {
-    const seriesTmdbId = String(entry.show.ids.tmdb!);
-    const watchedAt = new Date(entry.watched_at);
-    if (Number.isNaN(watchedAt.getTime())) {
-      errors.push(
-        `TV watch import skipped: invalid date for series ${seriesTmdbId} S${entry.episode.season}E${entry.episode.number}`
-      );
-      skippedCount += 1;
-      continue;
-    }
-    try {
-      await tvWatchService.markEpisodeWatched(
-        seriesTmdbId,
-        entry.episode.season,
-        entry.episode.number,
-        userId,
-        watchedAt,
-        TRAKT_SOURCE
-      );
-      importedCount += 1;
-    } catch (error) {
-      logger.error({ err: error, entry }, 'Failed to import Trakt TV episode history');
-      errors.push('TV episode watch import failed');
-      skippedCount += 1;
-    }
-  }
-
-  return { importedCount, skippedCount, errors };
 }
 
-export async function importTvFromTrakt(
+export async function importFromTraktDump(
   userId: number,
-  content: string,
+  zipBase64: string,
   options?: ServiceOptions
 ): Promise<ImportSummary> {
   const serviceLogger = options?.logger ?? LOGGER;
   const logger = serviceLogger.child({ module: 'import-service', source: TRAKT_SOURCE });
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to parse Trakt export JSON');
-    return { importedCount: 0, skippedCount: 0, errors: ['Invalid JSON content'] };
+  const decoded = decodeTraktDump(zipBase64, logger);
+  if (!decoded.success) {
+    return { importedCount: 0, skippedCount: 0, errors: decoded.errors };
   }
 
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    !('ratings' in parsed) ||
-    !('history' in parsed)
-  ) {
-    return { importedCount: 0, skippedCount: 0, errors: ['Invalid Trakt export structure'] };
-  }
-
-  return importTvFromTraktExport(userId, parsed as TraktExport, options ?? {});
-}
-
-export async function importFromTrakt(
-  userId: number,
-  content: string,
-  options?: ServiceOptions
-): Promise<ImportSummary> {
-  const serviceLogger = options?.logger ?? LOGGER;
-  const logger = serviceLogger.child({ module: 'import-service', source: TRAKT_SOURCE });
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to parse Trakt export JSON');
-    return { importedCount: 0, skippedCount: 0, errors: ['Invalid JSON content'] };
-  }
-
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    !('ratings' in parsed) ||
-    !('history' in parsed)
-  ) {
-    return { importedCount: 0, skippedCount: 0, errors: ['Invalid Trakt export structure'] };
-  }
-
-  return importFromTraktExport(userId, parsed as TraktExport, options ?? {});
+  return importFromTraktExport(userId, decoded.data, options ?? {});
 }
 
 export async function importFromFilmtipset(

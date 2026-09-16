@@ -8,27 +8,6 @@ This file has two parts:
 
 ## Commands
 
-## Adding a new package
-
-- Executable or service → `apps/<name>`. Shared library consumed by other packages →
-  `packages/<name>`. No registration step beyond creating the directory — `pnpm-workspace.yaml`
-  already globs `apps/*` and `packages/*`.
-
-- Only put code in `packages/*` once it's actually used by more than one app. Code used by a single
-  app stays in that app's own `src/` until a second consumer appears — don't pre-extract "shared"
-  packages speculatively.
-
-- `package.json`: scope the name `@carlba/<name>`, `"type": "module"`, `"private": true`. Declare
-  internal dependencies as `"@carlba/other": "workspace:*"`. Libraries need `main`/`types`/`exports`
-  pointing at `dist/`; bin apps need a `bin` field instead.
-
-- `tsconfig.json`:
-  `{ "extends": "../../tsconfig.json", "compilerOptions": { "rootDir": "./src", "outDir": "./dist" }, "include": ["src"] }`.
-  Libraries also set `declaration: true, declarationMap: true`.
-
-- `vitest.config.ts`: copy the shape used by all four existing packages — `environment: 'node'`, v8
-  coverage with `text`/`json`/`html` reporters, `dir: 'src'`.
-
 ## TypeScript & code style
 
 ### Clean code principles

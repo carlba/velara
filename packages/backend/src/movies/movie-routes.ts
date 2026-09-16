@@ -7,7 +7,7 @@ import { createWatchService } from '../watch/watch-service.js';
 import { createRatingService } from '../ratings/rating-service.js';
 import { createReviewService } from '../reviews/review-service.js';
 import { createCommentService } from '../comments/comment-service.js';
-import { importFromFilmtipset, importFromTrakt } from './import-service.js';
+import { importFromFilmtipset, importFromTraktDump } from './import-service.js';
 import { USER_FILTER_VALUES } from './movie-types.js';
 import type { SortBy, UserFilterValue } from './movie-types.js';
 
@@ -178,7 +178,9 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     async (request, reply) => {
       let summary;
       if (request.body.provider === 'trakt') {
-        summary = await importFromTrakt(request.user.userId, request.body.content);
+        summary = await importFromTraktDump(request.user.userId, request.body.content, {
+          logger: request.log,
+        });
       } else {
         summary = await importFromFilmtipset(
           request.user.userId,
