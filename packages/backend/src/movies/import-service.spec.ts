@@ -23,6 +23,7 @@ const findMovieByImdbIdMock = vi.fn();
 const upsertRatingMock = vi.fn();
 const getOrCreateWatchEntryMock = vi.fn();
 const createWatchEntryIfMissingMock = vi.fn();
+const createWatchEntryIfMissingForDayMock = vi.fn();
 
 vi.mock('./movie-service.js', () => ({
   createMovieService: () => ({ findMovieByImdbId: findMovieByImdbIdMock }),
@@ -34,6 +35,7 @@ vi.mock('../watch/watch-service.js', () => ({
   createWatchService: () => ({
     getOrCreateWatchEntry: getOrCreateWatchEntryMock,
     createWatchEntryIfMissing: createWatchEntryIfMissingMock,
+    createWatchEntryIfMissingForDay: createWatchEntryIfMissingForDayMock,
   }),
 }));
 
@@ -174,6 +176,7 @@ describe('Trakt import service', () => {
     findMovieByImdbIdMock.mockResolvedValue({ success: true, tmdbId: 123 });
     upsertRatingMock.mockResolvedValue({});
     createWatchEntryIfMissingMock.mockResolvedValue({});
+    createWatchEntryIfMissingForDayMock.mockResolvedValue({});
 
     const { importFromTraktDump } = importService;
 
@@ -218,10 +221,114 @@ describe('Trakt import service', () => {
       expect.any(Date),
       'trakt'
     );
-    expect(getOrCreateWatchEntryMock).toHaveBeenCalledWith(
+    expect(createWatchEntryIfMissingForDayMock).toHaveBeenCalledWith(
       123,
       1,
       new Date('2024-04-15T20:00:00Z'),
+      'trakt'
+    );
+  });
+
+  it('imports every watch history entry for a movie watched on multiple dates', async () => {
+    findMovieByImdbIdMock.mockResolvedValue({ success: true, tmdbId: 123 });
+    upsertRatingMock.mockResolvedValue({});
+    createWatchEntryIfMissingForDayMock.mockResolvedValue({});
+
+    const { importFromTraktDump } = importService;
+
+    const movie = {
+      title: 'Example Movie',
+      year: 2024,
+      ids: { tmdb: 123, imdb: 'tt1234567' },
+    };
+
+    const zipBase64 = buildTraktDumpZip({
+      'watched-history-1.json': [
+        {
+          id: 1,
+          watched_at: '2024-04-15T20:00:00Z',
+          action: 'watch',
+          type: 'movie',
+          movie,
+        },
+        {
+          id: 2,
+          watched_at: '2024-06-01T20:00:00Z',
+          action: 'watch',
+          type: 'movie',
+          movie,
+        },
+      ],
+    });
+
+    const summary = await importFromTraktDump(1, zipBase64);
+
+    expect(summary.importedCount).toBe(2);
+    expect(summary.skippedCount).toBe(0);
+    expect(summary.errors).toEqual([]);
+    expect(createWatchEntryIfMissingForDayMock).toHaveBeenCalledTimes(2);
+    expect(createWatchEntryIfMissingForDayMock).toHaveBeenCalledWith(
+      123,
+      1,
+      new Date('2024-04-15T20:00:00Z'),
+      'trakt'
+    );
+    expect(createWatchEntryIfMissingForDayMock).toHaveBeenCalledWith(
+      123,
+      1,
+      new Date('2024-06-01T20:00:00Z'),
+      'trakt'
+    );
+  });
+
+  it('records a watch entry once per raw history row and lets the DB collapse same-day duplicates', async () => {
+    findMovieByImdbIdMock.mockResolvedValue({ success: true, tmdbId: 123 });
+    upsertRatingMock.mockResolvedValue({});
+    createWatchEntryIfMissingForDayMock.mockResolvedValue({});
+
+    const { importFromTraktDump } = importService;
+
+    const movie = {
+      title: 'Example Movie',
+      year: 2024,
+      ids: { tmdb: 123, imdb: 'tt1234567' },
+    };
+
+    const zipBase64 = buildTraktDumpZip({
+      'watched-history-1.json': [
+        {
+          id: 1,
+          watched_at: '2024-04-15T10:00:00Z',
+          action: 'watch',
+          type: 'movie',
+          movie,
+        },
+        {
+          id: 2,
+          watched_at: '2024-04-15T22:00:00Z',
+          action: 'watch',
+          type: 'movie',
+          movie,
+        },
+      ],
+    });
+
+    const summary = await importFromTraktDump(1, zipBase64);
+
+    expect(summary.importedCount).toBe(2);
+    expect(summary.skippedCount).toBe(0);
+    expect(summary.errors).toEqual([]);
+    expect(createWatchEntryIfMissingForDayMock).toHaveBeenCalledTimes(2);
+    expect(createWatchEntryIfMissingForDayMock).toHaveBeenCalledWith(
+      123,
+      1,
+      new Date('2024-04-15T10:00:00Z'),
+      'trakt'
+    );
+    expect(createWatchEntryIfMissingForDayMock).toHaveBeenCalledWith(
+      123,
+      1,
+      new Date('2024-04-15T22:00:00Z'),
       'trakt'
     );
   });
@@ -279,5 +386,6 @@ describe('Trakt import service', () => {
       'filmtipset.ratings'
     );
     expect(getOrCreateWatchEntryMock).not.toHaveBeenCalled();
+    expect(createWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
   });
 });

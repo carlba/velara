@@ -281,28 +281,27 @@ async function importFromTraktExport(
     }
   }
 
-  const historyRows = dedupeTraktRows(
-    traktExport.history
-      .filter((entry): entry is TraktMovieHistoryEntry => entry.type === 'movie')
-      .map(entry => ({
-        key: getTraktMovieKey(entry.movie),
-        movie: entry.movie,
-        watchedAt: new Date(entry.watched_at),
-        timestamp: new Date(entry.watched_at),
-      }))
-      .filter(
-        (entry): entry is { key: string; movie: TraktMovie; watchedAt: Date; timestamp: Date } =>
-          Boolean(entry.key)
-      )
-  );
+  const rawHistoryRows = traktExport.history
+    .filter((entry): entry is TraktMovieHistoryEntry => entry.type === 'movie')
+    .map(entry => ({
+      key: getTraktMovieKey(entry.movie),
+      movie: entry.movie,
+      watchedAt: new Date(entry.watched_at),
+    }))
+    .filter(
+      (entry): entry is { key: string; movie: TraktMovie; watchedAt: Date } => Boolean(entry.key)
+    );
 
-  for (const row of historyRows.values()) {
+  const validHistoryRows = rawHistoryRows.filter(row => {
     if (Number.isNaN(row.watchedAt.getTime())) {
       errors.push(`Watch import skipped: invalid watch date for ${row.key}`);
       skippedCount += 1;
-      continue;
+      return false;
     }
+    return true;
+  });
 
+  for (const row of validHistoryRows) {
     const resolved = await resolveTraktMovieTmdbId(row.movie, movieService);
     if (!resolved.success) {
       errors.push(`Watch import skipped: ${resolved.message}`);
@@ -311,7 +310,7 @@ async function importFromTraktExport(
     }
 
     try {
-      await watchService.getOrCreateWatchEntry(
+      await watchService.createWatchEntryIfMissingForDay(
         resolved.tmdbId,
         userId,
         row.watchedAt,
