@@ -1,6 +1,5 @@
 import { apiRequest } from './api-client';
 import type { UserTvData } from '@/types/tv-show';
-import type { ImportSummary } from './user-data-api';
 
 export async function fetchUserTvData(seriesId: string): Promise<UserTvData> {
   return apiRequest<UserTvData>(`/api/tv/${seriesId}/user-data`);
@@ -63,12 +62,5 @@ export async function unmarkEpisodeWatched(
   await apiRequest(`/api/tv/${seriesId}/watch`, {
     method: 'DELETE',
     body: JSON.stringify({ seasonNumber, episodeNumber }),
-  });
-}
-
-export async function importTvShows(content: string): Promise<ImportSummary> {
-  return apiRequest<ImportSummary>('/api/tv/import', {
-    method: 'POST',
-    body: JSON.stringify({ content }),
   });
 }

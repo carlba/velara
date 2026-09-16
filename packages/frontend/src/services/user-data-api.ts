@@ -64,6 +64,7 @@ export async function importFilmtipset(
   return importMovies(content, 'filmtipset', type);
 }
 
+/** `content` is a base64-encoded Trakt data-dump zip. */
 export async function importTrakt(content: string): Promise<ImportSummary> {
   return importMovies(content, 'trakt', 'ratings');
 }

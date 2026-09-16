@@ -1,6 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { zipSync, strToU8 } from 'fflate';
 import type { parseFilmtipsetCsvRows as ParseFilmtipsetCsvRows } from './import-service.js';
 import { z } from 'zod';
+
+function buildTraktDumpZip(files: Record<string, unknown>): string {
+  const entries: Record<string, Uint8Array> = {};
+  for (const [filename, content] of Object.entries(files)) {
+    entries[filename] = strToU8(JSON.stringify(content));
+  }
+  return Buffer.from(zipSync(entries)).toString('base64');
+}
 
 const originalEnv = { ...process.env };
 
@@ -161,15 +170,15 @@ describe('import service helpers', () => {
 });
 
 describe('Trakt import service', () => {
-  it('imports ratings and watch history from a valid Trakt JSON export', async () => {
+  it('imports ratings and watch history from a valid Trakt data dump zip', async () => {
     findMovieByImdbIdMock.mockResolvedValue({ success: true, tmdbId: 123 });
     upsertRatingMock.mockResolvedValue({});
     createWatchEntryIfMissingMock.mockResolvedValue({});
 
-    const { importFromTrakt } = importService;
+    const { importFromTraktDump } = importService;
 
-    const content = JSON.stringify({
-      ratings: [
+    const zipBase64 = buildTraktDumpZip({
+      'ratings-movies-1.json': [
         {
           rated_at: '2024-05-01T12:00:00Z',
           rating: 8,
@@ -181,7 +190,7 @@ describe('Trakt import service', () => {
           },
         },
       ],
-      history: [
+      'watched-history-1.json': [
         {
           id: 1,
           watched_at: '2024-04-15T20:00:00Z',
@@ -196,7 +205,7 @@ describe('Trakt import service', () => {
       ],
     });
 
-    const summary = await importFromTrakt(1, content);
+    const summary = await importFromTraktDump(1, zipBase64);
 
     expect(summary.importedCount).toBe(2);
     expect(summary.skippedCount).toBe(0);
@@ -217,14 +226,29 @@ describe('Trakt import service', () => {
     );
   });
 
-  it('returns an error summary for invalid Trakt JSON content', async () => {
-    const { importFromTrakt } = importService;
+  it('returns an error summary when content is not a valid zip', async () => {
+    const { importFromTraktDump } = importService;
 
-    const summary = await importFromTrakt(1, '{ invalid json');
+    const summary = await importFromTraktDump(1, Buffer.from('not a zip').toString('base64'));
 
     expect(summary.importedCount).toBe(0);
     expect(summary.skippedCount).toBe(0);
-    expect(summary.errors).toEqual(['Invalid JSON content']);
+    expect(summary.errors).toHaveLength(1);
+    expect(summary.errors[0]).toContain('Failed to read data dump zip');
+  });
+
+  it('returns an error summary for a zip with no recognized dump files', async () => {
+    const { importFromTraktDump } = importService;
+
+    const zipBase64 = buildTraktDumpZip({ 'user-profile.json': { username: 'someone' } });
+
+    const summary = await importFromTraktDump(1, zipBase64);
+
+    expect(summary.importedCount).toBe(0);
+    expect(summary.skippedCount).toBe(0);
+    expect(summary.errors).toEqual([
+      'No recognized Trakt data dump files were found in the zip',
+    ]);
   });
 
   it('imports Filmtipset ratings without creating duplicate watch history for existing entries', async () => {

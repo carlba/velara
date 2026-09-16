@@ -1,7 +1,6 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { authenticate } from '../auth/auth-middleware.js';
-import { importTvFromTrakt } from '../movies/import-service.js';
 import { createTvShowService } from './tv-show-service.js';
 import { createTvUserDataService } from './tv-user-data-service.js';
 import { createTvWatchService } from './tv-watch-service.js';
@@ -65,22 +64,7 @@ const SORT_REQUIRED_FILTER: Partial<Record<TvSortBy, TvUserFilterValue>> = {
   my_rating: 'rated',
 };
 
-const importBodySchema = z.object({
-  content: z.string().min(1),
-});
-
 export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
-  fastify.post(
-    '/import',
-    { preHandler: authenticate, schema: { body: importBodySchema } },
-    async (request, reply) => {
-      const summary = await importTvFromTrakt(request.user.userId, request.body.content, {
-        logger: request.log,
-      });
-      return reply.send(summary);
-    }
-  );
-
   fastify.get('/', { schema: { querystring: listQuerySchema } }, async (request, reply) => {
     const { series_id, search, page, sort_by, user_filter } = request.query;
 
