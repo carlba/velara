@@ -11,238 +11,262 @@ datasource db {
 }
 
 model User {
-  id             Int            @id @default(autoincrement())
-  email          String         @unique
-  username       String         @unique
-  passwordHash   String
-  createdAt      DateTime       @default(now())
-  reviews        Review[]
-  comments       Comment[]
-  watchEntries   WatchEntry[]
-  watchHistories WatchHistory[]
-  ratings        Rating[]
-  tvWatchEntries TvWatchEntry[]
-  tvWatchHistories TvWatchHistory[]
-  tvRatings      TvRating[]
-  tvReviews      TvReview[]
-  tvComments     TvComment[]
-  lists          List[]
+  id                 Int                  @id @default(autoincrement())
+  email              String               @unique
+  username           String               @unique
+  passwordHash       String               @map("password_hash")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  reviews            Review[]
+  comments           Comment[]
+  watchEntries       WatchEntry[]
+  watchHistories     WatchHistory[]
+  ratings            Rating[]
+  tvWatchEntries     TvWatchEntry[]
+  tvWatchHistories   TvWatchHistory[]
+  tvRatings          TvRating[]
+  tvReviews          TvReview[]
+  tvComments         TvComment[]
+  lists              List[]
   flexgetIntegration FlexgetIntegration?
-  traktIntegration TraktIntegration?
-  plexIntegration PlexIntegration?
+  traktIntegration   TraktIntegration?
+  plexIntegration    PlexIntegration?
+
+  @@map("users")
 }
 
 model Review {
   id        Int      @id @default(autoincrement())
-  tmdbId    Int
-  userId    Int
+  tmdbId    Int      @map("tmdb_id")
+  userId    Int      @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([tmdbId, userId])
+  @@map("reviews")
 }
 
 model WatchEntry {
-  id              Int      @id @default(autoincrement())
-  tmdbId          Int
-  userId          Int
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  latestWatchedAt DateTime
-  source          String   @default("manual")
-  createdAt       DateTime @default(now())
+  id              Int            @id @default(autoincrement())
+  tmdbId          Int            @map("tmdb_id")
+  userId          Int            @map("user_id")
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latestWatchedAt DateTime       @map("latest_watched_at")
+  source          String         @default("manual")
+  createdAt       DateTime       @default(now()) @map("created_at")
   watchHistory    WatchHistory[]
 
   @@unique([tmdbId, userId])
+  @@map("watch_entries")
 }
 
 model WatchHistory {
-  id            Int        @id @default(autoincrement())
-  tmdbId        Int
-  userId        Int
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  watchEntryId  Int
-  watchEntry    WatchEntry @relation(fields: [watchEntryId], references: [id], onDelete: Cascade)
-  watchedAt     DateTime
-  source        String     @default("manual")
-  createdAt     DateTime   @default(now())
+  id           Int        @id @default(autoincrement())
+  tmdbId       Int        @map("tmdb_id")
+  userId       Int        @map("user_id")
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchEntryId Int        @map("watch_entry_id")
+  watchEntry   WatchEntry @relation(fields: [watchEntryId], references: [id], onDelete: Cascade)
+  watchedAt    DateTime   @map("watched_at")
+  source       String     @default("manual")
+  createdAt    DateTime   @default(now()) @map("created_at")
 
   @@index([tmdbId])
   @@index([userId])
   @@index([watchEntryId])
+  @@map("watch_histories")
 }
 
 model Rating {
-  id         Int      @id @default(autoincrement())
-  tmdbId     Int
-  userId     Int
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         Int       @id @default(autoincrement())
+  tmdbId     Int       @map("tmdb_id")
+  userId     Int       @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   score      Int
-  source     String   @default("manual")
-  ratedAt    DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  importedAt DateTime?
+  source     String    @default("manual")
+  ratedAt    DateTime? @map("rated_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  importedAt DateTime? @map("imported_at")
 
   @@unique([tmdbId, userId])
+  @@map("ratings")
 }
 
 model Comment {
-  id         Int      @id @default(autoincrement())
-  tmdbId     Int
-  userId     Int
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         Int       @id @default(autoincrement())
+  tmdbId     Int       @map("tmdb_id")
+  userId     Int       @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   content    String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  importedAt DateTime?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  importedAt DateTime? @map("imported_at")
 
   @@index([tmdbId])
+  @@map("comments")
 }
 
 model TvWatchEntry {
-  id              Int           @id @default(autoincrement())
-  seriesTmdbId    String
-  seasonNumber    Int
-  episodeNumber   Int
-  userId          Int
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  latestWatchedAt DateTime
-  source          String        @default("manual")
-  createdAt       DateTime      @default(now())
+  id              Int              @id @default(autoincrement())
+  seriesTmdbId    String           @map("series_tmdb_id")
+  seasonNumber    Int              @map("season_number")
+  episodeNumber   Int              @map("episode_number")
+  userId          Int              @map("user_id")
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latestWatchedAt DateTime         @map("latest_watched_at")
+  source          String           @default("manual")
+  createdAt       DateTime         @default(now()) @map("created_at")
   watchHistory    TvWatchHistory[]
 
   @@unique([seriesTmdbId, seasonNumber, episodeNumber, userId])
+  @@map("tv_watch_entries")
 }
 
 model TvWatchHistory {
-  id             Int           @id @default(autoincrement())
-  seriesTmdbId   String
-  seasonNumber   Int
-  episodeNumber  Int
-  userId         Int
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tvWatchEntryId Int
-  tvWatchEntry   TvWatchEntry  @relation(fields: [tvWatchEntryId], references: [id], onDelete: Cascade)
-  watchedAt      DateTime
-  source         String        @default("manual")
-  createdAt      DateTime      @default(now())
+  id             Int          @id @default(autoincrement())
+  seriesTmdbId   String       @map("series_tmdb_id")
+  seasonNumber   Int          @map("season_number")
+  episodeNumber  Int          @map("episode_number")
+  userId         Int          @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tvWatchEntryId Int          @map("tv_watch_entry_id")
+  tvWatchEntry   TvWatchEntry @relation(fields: [tvWatchEntryId], references: [id], onDelete: Cascade)
+  watchedAt      DateTime     @map("watched_at")
+  source         String       @default("manual")
+  createdAt      DateTime     @default(now()) @map("created_at")
 
   @@index([seriesTmdbId])
   @@index([userId])
   @@index([tvWatchEntryId])
+  @@map("tv_watch_histories")
 }
 
 model TvRating {
   id           Int       @id @default(autoincrement())
-  seriesTmdbId String
-  seasonNumber Int       @default(0)
-  userId       Int
+  seriesTmdbId String    @map("series_tmdb_id")
+  seasonNumber Int       @default(0) @map("season_number")
+  userId       Int       @map("user_id")
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   score        Int
   source       String    @default("manual")
-  ratedAt      DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  importedAt   DateTime?
+  ratedAt      DateTime? @map("rated_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  importedAt   DateTime? @map("imported_at")
 
   @@unique([seriesTmdbId, seasonNumber, userId])
+  @@map("tv_ratings")
 }
 
 model TvReview {
   id           Int      @id @default(autoincrement())
-  seriesTmdbId String
-  userId       Int
+  seriesTmdbId String   @map("series_tmdb_id")
+  userId       Int      @map("user_id")
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   content      String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@unique([seriesTmdbId, userId])
+  @@map("tv_reviews")
 }
 
 model TvComment {
   id           Int       @id @default(autoincrement())
-  seriesTmdbId String
-  userId       Int
+  seriesTmdbId String    @map("series_tmdb_id")
+  userId       Int       @map("user_id")
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   content      String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  importedAt   DateTime?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  importedAt   DateTime? @map("imported_at")
 
   @@index([seriesTmdbId])
+  @@map("tv_comments")
 }
 
 model List {
-  id                 Int             @id @default(autoincrement())
-  title              String
-  description        String?
-  creatorId          Int
-  creator            User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  items              ListItem[]
-  flexgetConnection  ListIntegration?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  id                Int              @id @default(autoincrement())
+  title             String
+  description       String?
+  creatorId         Int              @map("creator_id")
+  creator           User             @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  items             ListItem[]
+  flexgetConnection ListIntegration?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  @@map("lists")
 }
 
 model ListItem {
   id            Int          @id @default(autoincrement())
   list          List         @relation(fields: [listId], references: [id], onDelete: Cascade)
-  listId        Int
+  listId        Int          @map("list_id")
   type          ListItemType
-  movieTmdbId   Int?
-  seriesTmdbId  String?
-  seasonNumber  Int?
-  episodeNumber Int?
-  remoteEntryId Int?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  movieTmdbId   Int?         @map("movie_tmdb_id")
+  seriesTmdbId  String?      @map("series_tmdb_id")
+  seasonNumber  Int?         @map("season_number")
+  episodeNumber Int?         @map("episode_number")
+  remoteEntryId Int?         @map("remote_entry_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@map("list_items")
 }
 
 model FlexgetIntegration {
   id        Int      @id @default(autoincrement())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int      @unique
-  baseUrl   String
+  userId    Int      @unique @map("user_id")
+  baseUrl   String   @map("base_url")
   username  String
   password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("flexget_integrations")
 }
 
 model ListIntegration {
   id            Int      @id @default(autoincrement())
   list          List     @relation(fields: [listId], references: [id], onDelete: Cascade)
-  listId        Int      @unique
-  entryListName String
-  remoteListId  Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  listId        Int      @unique @map("list_id")
+  entryListName String   @map("entry_list_name")
+  remoteListId  Int      @map("remote_list_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("list_integrations")
 }
 
 model TraktIntegration {
-  id            Int      @id @default(autoincrement())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        Int      @unique
-  accessToken   String
-  refreshToken  String
-  expiresAt     DateTime
-  traktUsername String?
-  traktSlug     String?
-  lastSyncedAt  DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id            Int       @id @default(autoincrement())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int       @unique @map("user_id")
+  accessToken   String    @map("access_token")
+  refreshToken  String    @map("refresh_token")
+  expiresAt     DateTime  @map("expires_at")
+  traktUsername String?   @map("trakt_username")
+  traktSlug     String?   @map("trakt_slug")
+  lastSyncedAt  DateTime? @map("last_synced_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("trakt_integrations")
 }
 
 model PlexIntegration {
   id           Int      @id @default(autoincrement())
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       Int      @unique
-  webhookToken String   @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  userId       Int      @unique @map("user_id")
+  webhookToken String   @unique @map("webhook_token")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("plex_integrations")
 }
 
 enum ListItemType {
