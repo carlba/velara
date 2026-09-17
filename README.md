@@ -1,8 +1,8 @@
 # Velara
 
-A full-stack movie tracker app. Search and discover movies via TMDB,
-track what you've watched, rate films 1–5, and write reviews. Displays
-TMDB, IMDb, and Rotten Tomatoes ratings on each movie detail page.
+A full-stack movie tracker app. Search and discover movies via TMDB, track what you've watched, rate
+films 1–5, and write reviews. Displays TMDB, IMDb, and Rotten Tomatoes ratings on each movie detail
+page.
 
 ## Features
 
@@ -17,8 +17,7 @@ TMDB, IMDb, and Rotten Tomatoes ratings on each movie detail page.
 ## Installation
 
 Requires Node.js 24+, Docker (for PostgreSQL), and API keys for
-[TMDB](https://www.themoviedb.org/settings/api) and
-[OMDb](https://www.omdbapi.com/apikey.aspx).
+[TMDB](https://www.themoviedb.org/settings/api) and [OMDb](https://www.omdbapi.com/apikey.aspx).
 
 ```bash
 cp .env.example .env
@@ -41,12 +40,11 @@ cd packages/backend && npx prisma migrate dev
 npm run start:dev --workspaces --if-present
 ```
 
-The backend runs on `http://localhost:3070` and the frontend on
-`http://localhost:5173`.
+The backend runs on `http://localhost:3070` and the frontend on `http://localhost:5173`.
 
 ## Usage
 
-```bash
+````bash
 # Generate backend Prisma client (required after install or schema changes)
 cd packages/backend && npm run db:generate
 
@@ -70,34 +68,34 @@ finishes playing them, via a Plex webhook.
    ```js
    await fetch('/api/plex/integration', { method: 'POST', credentials: 'include' })
      .then(r => r.json())
-   ```
+````
 
-   This reuses your existing login session cookie automatically. The
-   response includes a `webhookToken`. Your webhook URL is:
+This reuses your existing login session cookie automatically. The response includes a
+`webhookToken`. Your webhook URL is:
 
-   ```
-   http://<velara-backend-host>:3070/api/plex/webhook/<webhookToken>
-   ```
+```
+http://<velara-backend-host>:3070/api/plex/webhook/<webhookToken>
+```
 
-2. In Plex, go to **Settings → Webhooks** (requires Plex Pass) and add the
-   URL above.
+2. In Plex, go to **Settings → Webhooks** (requires Plex Pass) and add the URL above.
 
-3. Play a movie or episode to completion in Plex. Velara listens for
-   `media.scrobble` events and marks the corresponding title as watched,
-   matching it by TMDB, IMDb, or TheTVDB id embedded in the Plex metadata.
+3. Play a movie or episode to completion in Plex. Velara listens for `media.scrobble` events and
+   marks the corresponding title as watched, matching it by TMDB, IMDb, or TheTVDB id embedded in
+   the Plex metadata.
 
 Notes:
 
-- The webhook URL contains a secret token and is not otherwise
-  authenticated — treat it like a password and rotate it (`POST
-  /api/plex/integration` again) if it leaks.
+- The webhook URL contains a secret token and is not otherwise authenticated — treat it like a
+  password and rotate it (`POST /api/plex/integration` again) if it leaks.
 - Remove the integration with `DELETE /api/plex/integration`.
-- Since Plex webhooks don't include a real watch history, Velara dedupes
-  by user and by day, so repeated or duplicate scrobble events for the same
-  title on the same day won't create extra watch history entries.
+- Since Plex webhooks don't include a real watch history, Velara dedupes by user and by day, so
+  repeated or duplicate scrobble events for the same title on the same day won't create extra watch
+  history entries.
 
 ## Database dump and restore
-The database dump and restore commands execute `pg_dump` and `psql` inside the `postgres` container from the repository Docker Compose setup.
+
+The database dump and restore commands execute `pg_dump` and `psql` inside the `postgres` container
+from the repository Docker Compose setup.
 
 ```bash
 cd packages/backend
