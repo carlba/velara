@@ -26,6 +26,11 @@ export default function HistoryCard({ item }: HistoryCardProps) {
   const isMovie = item.mediaType === 'movie';
   const linkTo = isMovie ? `/movies/${item.tmdbId}` : `/tv/${item.seriesTmdbId}`;
   const posterSrc = isMovie ? item.posterPath : (item.stillPath ?? item.posterPath);
+  const watchedTime = new Date(item.watchedAt).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 
   const handleConfirmDelete = () => {
     deleteRecord.mutate(item);
@@ -69,6 +74,7 @@ export default function HistoryCard({ item }: HistoryCardProps) {
                 </p>
               </>
             )}
+            <p className="text-xs text-white/70 mt-0.5">{watchedTime}</p>
           </div>
         </div>
       </Link>
