@@ -15,6 +15,7 @@ import { listRoutes } from './lists/list-routes.js';
 import { flexgetRoutes } from './flexget/flexget-routes.js';
 import { traktRoutes } from './trakt/trakt-routes.js';
 import { plexRoutes } from './plex/plex-routes.js';
+import { historyRoutes } from './history/history-routes.js';
 import { startTraktSyncScheduler } from './trakt/trakt-scheduler.js';
 
 const logger = LOGGER.child({ module: 'index' });
@@ -67,6 +68,7 @@ await server.register(listRoutes, { prefix: '/api/lists' });
 await server.register(flexgetRoutes, { prefix: '/api/flexget' });
 await server.register(traktRoutes, { prefix: '/api/trakt' });
 await server.register(plexRoutes, { prefix: '/api/plex' });
+await server.register(historyRoutes, { prefix: '/api/history' });
 
 server.get('/health', () => ({ status: 'ok' }));
 

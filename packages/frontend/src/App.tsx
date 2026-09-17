@@ -6,6 +6,7 @@ import TvShowsPage from '@/pages/tv-shows/TvShowsPage';
 import TvShowDetailsPage from '@/pages/tv-show-details/TvShowDetailsPage';
 import ListsPage from '@/pages/lists/ListsPage';
 import ListDetailsPage from '@/pages/lists/ListDetailsPage';
+import HistoryPage from '@/pages/history/HistoryPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="tv/:seriesId" element={<TvShowDetailsPage />} />
         <Route path="lists" element={<ListsPage />} />
         <Route path="lists/:listId" element={<ListDetailsPage />} />
+        <Route path="history" element={<HistoryPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="trakt-callback" element={<TraktCallbackPage />} />
         <Route path="login" element={<LoginPage />} />

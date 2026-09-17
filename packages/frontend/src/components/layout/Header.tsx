@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Film, List, LogOut, Tv, User } from 'lucide-react';
+import { Film, History, List, LogOut, Tv, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ThemeToggle from '@/components/layout/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +38,12 @@ export default function Header() {
             <Link to="/lists" className="flex items-center gap-1.5 text-sm">
               <List className="h-4 w-4" />
               <span className="hidden sm:inline">Lists</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/history" className="flex items-center gap-1.5 text-sm">
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">History</span>
             </Link>
           </Button>
           <ThemeToggle />
