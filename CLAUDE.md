@@ -2,11 +2,103 @@
 
 ## Overview
 
-This file has two parts:
-
 ## Structure & dependency graph
 
-## Commands
+Velara is an npm-workspaces monorepo (`packages/*`) for a full-stack movie/TV tracker: a Fastify
+backend and a React (Vite) frontend, sharing no code package today — the frontend calls the backend
+only over HTTP.
+
+```
+velara/
+├── packages/
+│   ├── backend/    → Fastify + Prisma API (packages/backend/src)
+│   └── frontend/   → React + Vite SPA (packages/frontend/src)
+├── docs/           → third-party API references (Trakt, Flexget, Plex webhook payloads)
+├── specs/          → freeform feature specs (e.g. rating-scale-and-half-star.md)
+└── docker-compose.yml, Dockerfile  → postgres + app containers
+```
+
+Root `package.json` only orchestrates workspaces (`npm run build/lint/test` fan out via
+`--workspaces`); there is no shared root `src`.
+
+### Backend (`packages/backend/src`)
+
+Layering is consistent across every feature folder: **routes → service(s) → Prisma / external
+client**. Routes are thin Fastify plugins that validate with zod and call one or more
+`create*Service()` factories; services hold the business logic and are the only layer that touches
+`prisma` or outbound HTTP clients.
+
+- `index.ts` — composition root. Registers Fastify plugins (helmet, cors, cookie, jwt), mounts every
+  `*-routes.ts` under its `/api/*` prefix, and starts `trakt-scheduler`.
+- `registry.ts` — process-wide singletons: `config` (parsed env, via `lib/config.ts` + `schema.ts`)
+  and `LOGGER` (pino, via `lib/logger.ts`). Nearly every other module imports `LOGGER`/`config` from
+  here rather than re-reading env.
+- `lib/` — cross-cutting utilities: `prisma.ts` (the shared `PrismaClient` instance), `config.ts` /
+  `schema.ts` (zod-validated env), `logger.ts`, `http-error.ts`.
+- `auth/` — `auth-service` (bcrypt + JWT) backs `auth-middleware` (`authenticate` preHandler used by
+  almost every other route file) and `auth-routes` (`/api/auth`).
+- `movies/` — `movie-service` is the hub: it calls `tmdb-client` and `omdb-client` (outbound `got`
+  clients for TMDB/OMDb) and is consumed by `movie-routes`. `user-data-service` layers per-user
+  state (watched/rating/review/comment) over a movie via `watch-service`, `ratings/rating-service`,
+  `reviews/review-service`, `comments/comment-service`. `import-service` /`export-service` handle
+  Filmtipset/Trakt-dump import and Letterboxd-style export.
+- `tv-shows/` — mirrors `movies/` for series: `tv-show-service` (TMDB TV data) +
+  `tv-user-data-service`, `tv-watch-service`, `tv-rating-service`, `tv-review-service`,
+  `tv-comment-service`, all behind `tv-show-routes`.
+- `watch/watch-source.ts` — shared enum/type for where a watch event originated (manual, Trakt,
+  Plex, Flexget); imported by `movies/import-service`, `watch/watch-service`,
+  `tv-shows/tv-watch-service`, `trakt/trakt-service`, and `plex/plex-service` so all watch-history
+  writers agree on provenance.
+- `trakt/` — `trakt-service` syncs Trakt history (using `watch-source`); `trakt-scheduler` runs it
+  on an interval from `index.ts`; `trakt-dump-service` parses Trakt data-export files (used by
+  `movies/import-service`); `trakt-routes` exposes OAuth + manual-sync endpoints.
+- `plex/` — `plex-client` (got) + `plex-guid` (Plex GUID → TMDB id parsing) back `plex-service`,
+  which handles incoming Plex webhook scrobble events (`plex-routes`) and writes watch history via
+  `watch-source`.
+- `flexget/` — `flexget-service` talks to a self-hosted Flexget instance for download automation
+  (`flexget-routes`).
+- `lists/` — user-curated lists (`list-service`, `list-routes`); items reference movies/shows by id.
+- `history/` — read-only aggregated watch-history feed (`history-service`, `history-routes`) that
+  merges movie + TV watch entries for the frontend's History page.
+- `prisma/schema.prisma` — source of truth for the data model (`User`, movie tables
+  `WatchEntry`/`WatchHistory`/`Rating`/`Review`/`Comment`, their `Tv*` equivalents, `List`/
+  `ListItem`, and per-integration tables `TraktIntegration`/`PlexIntegration`/
+  `FlexgetIntegration`/`ListIntegration`). Run `npm run db:migrate` (backend) after schema edits.
+
+### Frontend (`packages/frontend/src`)
+
+- `main.tsx` → `App.tsx` — React Router route table (`/movies`, `/tv`, `/lists`, `/history`,
+  `/profile`, `/login`, `/register`, `/trakt-callback`), all nested under
+  `components/layout/Layout`.
+- `pages/<feature>/` — one page component per route; pages compose hooks + components, holding no
+  fetch logic themselves.
+- `hooks/` — React Query hooks (`useMovies`, `useTvShows`, `useHistory`, `useUserMovieData`,
+  `useUserTvData`, `useMovieComments`, `useTvComments`, …) plus non-data hooks `useAuth` (auth
+  context) and `useTheme` (dark mode). Each data hook wraps exactly one `services/*-api.ts` module.
+- `services/*-api.ts` — one file per backend route prefix (`movies-api` ↔ `/api/movies`,
+  `tv-shows-api` ↔ `/api/tv`, `lists-api`, `history-api`, `trakt-api`, `flexget-api`, `auth-api`,
+  `comments-api`, `tv-comments-api`, `user-data-api`, `user-tv-data-api`); all go through the shared
+  `services/api-client.ts` (fetch wrapper with credentials + base URL).
+- `components/<feature>/` — presentational components grouped by domain (`movies/`, `tv-shows/`,
+  `history/`, `lists/`, `layout/`); `components/ui/` is the shadcn/ui primitive set (owned,
+  generated source — edit in place, don't hand-roll new primitives there).
+- `types/` — shared TS types mirroring backend response shapes per domain (`movie.ts`, `tv-show.ts`,
+  `list.ts`, `history.ts`, `user.ts`).
+- `lib/utils.ts` (shadcn `cn()` helper) and `lib/query-params.ts` (URL search-param helpers used
+  with `useSearchParams`).
+
+### Cross-cutting dependency flow
+
+```
+frontend/pages → frontend/hooks (React Query) → frontend/services/*-api → HTTP → backend routes
+backend routes → backend services → backend/lib (prisma, config, logger) + external clients
+                                   ↘ watch/watch-source.ts (shared provenance type)
+external clients: tmdb-client, omdb-client, plex-client, trakt (REST), flexget (REST) — all via `got`
+```
+
+When adding a new domain feature, follow the existing folder shape: `<domain>-types.ts` →
+`<domain>-service.ts` (+ `.spec.ts`) → `<domain>-routes.ts` on the backend, and
+`services/<domain>-api.ts` → `hooks/use<Domain>.ts` → `pages/<domain>/` on the frontend.
 
 ## TypeScript & code style
 
@@ -89,31 +181,6 @@ Before considering a change done:
 
 These apply once the corresponding capability is added to the template. Follow them at that point;
 their absence today isn't a signal to avoid them.
-
-## CLI apps
-
-Applies to any `apps/*` package that is a command-line tool — already true for `apps/cli`, and the
-template for future CLI apps.
-
-- Use [Commander](https://www.npmjs.com/package/commander).
-
-- The package's `bin` entry should match the project name and point to `dist/cli.js`.
-
-- The entry file (`cli.ts`) should construct and run the `Command` program; put each subcommand in a
-  domain appropriate folder (see `apps/cli/src/greet/greet-command.ts` as the template) and register
-  it from the entry file.
-
-- Include a `prepare` script that runs the package's build so `npm link`/`pnpm link` works locally.
-
-- Bootstrap config/logging via `@carlba/config` + `@carlba/logger`, as shown above.
-
-- Keep business logic out of command files (`src/<domain>/*-command.ts`) and in plain
-  classes/functions (e.g. `src/greeting`'s `GreetingService`) that take their dependencies as
-  constructor/function params — commands stay thin, parsing args and formatting output. Wire
-  dependencies by hand in `cli.ts` and pass them down explicitly; do not introduce InferDI or any DI
-  container here. A CLI invocation is a single-shot process with no per-request scope to manage, so
-  a container adds indirection without solving a problem — InferDI is a Part B backend/API
-  convention for managing per-request scope in a long-running server, which doesn't apply here.
 
 ## HTTP client usage
 
