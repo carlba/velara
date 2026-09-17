@@ -1,0 +1,41 @@
+POST http://localhost:3070/api/plex/webhook/016f7203a298a387337430a19c81d3771cd29a84468a8d622a754170b85c8f12
+Content-Type: multipart/form-data; boundary=plex-webhook
+
+--plex-webhook
+Content-Disposition: form-data; name="payload"
+Content-Type: application/json
+
+{
+  "event": "media.scrobble",
+  "Metadata": {
+    "type": "episode",
+    "parentIndex": 3,
+    "index": 1,
+    "librarySectionType": "show",
+    "ratingKey": "63132",
+    "key": "/library/metadata/63132",
+    "parentRatingKey": "63120",
+    "grandparentRatingKey": "63119",
+    "guid": "plex://episode/63ec49cf5b8dfd1baae418b8",
+    "parentGuid": "plex://season/63ec49cc5b8dfd1baae418b5",
+    "grandparentGuid": "plex://show/5e204251072b9e003ca5c140",
+    "grandparentSlug": "ted-lasso",
+    "title": "Smells Like Mean Spirit",
+    "grandparentKey": "/library/metadata/63119",
+    "parentKey": "/library/metadata/63120",
+    "librarySectionTitle": "Shows",
+    "librarySectionID": 4,
+    "librarySectionKey": "/library/sections/4",
+    "grandparentTitle": "Ted Lasso",
+    "parentTitle": "Season 3",
+    "contentRating": "TV-MA",
+    "summary": "",
+    "viewCount": 4,
+    "lastViewedAt": 1789639538,
+    "originallyAvailableAt": "2023-03-14",
+    "addedAt": 1789195701,
+    "updatedAt": 1789261534
+  }
+}
+
+--plex-webhook--

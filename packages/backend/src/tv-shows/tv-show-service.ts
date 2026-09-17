@@ -29,6 +29,14 @@ interface ServiceOptions {
   logger?: ServiceLogger;
 }
 
+type FindTvShowByExternalIdResult =
+  | { success: true; seriesTmdbId: string }
+  | {
+      success: false;
+      reason: 'not_found' | 'movie_results';
+      message: string;
+    };
+
 function extractRating(
   ratings: { Source: string; Value: string }[],
   source: string
@@ -204,6 +212,51 @@ export function createTvShowService(options?: ServiceOptions) {
     }
   }
 
+  async function findTvShowByExternalId(
+    externalId: string,
+    externalSource: 'imdb_id' | 'tvdb_id'
+  ): Promise<FindTvShowByExternalIdResult> {
+    const logger = localLogger('findTvShowByExternalId');
+
+    try {
+      const response = await tmdbClient
+        .get(`find/${externalId}`, {
+          searchParams: { external_source: externalSource },
+        })
+        .json<{
+          movie_results: unknown[];
+          tv_results: { id: number }[];
+          person_results: unknown[];
+          tv_episode_results: unknown[];
+          tv_season_results: unknown[];
+        }>();
+
+      if (response.tv_results.length > 0) {
+        return { success: true, seriesTmdbId: String(response.tv_results[0].id) };
+      }
+
+      if (response.movie_results.length > 0) {
+        return {
+          success: false,
+          reason: 'movie_results',
+          message: 'TMDB returned movie results instead of TV results',
+        };
+      }
+
+      return {
+        success: false,
+        reason: 'not_found',
+        message: 'No TMDB TV result found for this external id',
+      };
+    } catch (error) {
+      logger.error({ externalId, externalSource, err: error }, 'TMDB lookup by external id failed');
+      if (error instanceof HTTPError) {
+        throw new Error(`TMDB lookup failed: ${error.response.statusCode}`, { cause: error });
+      }
+      throw error;
+    }
+  }
+
   async function getTvSeason(seriesTmdbId: string, seasonNumber: number): Promise<TvSeason> {
     const logger = localLogger('getTvSeason');
 
@@ -244,5 +297,12 @@ export function createTvShowService(options?: ServiceOptions) {
     }
   }
 
-  return { searchTvShows, discoverTvShows, getTvShowById, getTvShowDetails, getTvSeason };
+  return {
+    searchTvShows,
+    discoverTvShows,
+    getTvShowById,
+    getTvShowDetails,
+    findTvShowByExternalId,
+    getTvSeason,
+  };
 }

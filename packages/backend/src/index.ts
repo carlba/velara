@@ -14,6 +14,7 @@ import { tvRoutes } from './tv-shows/tv-show-routes.js';
 import { listRoutes } from './lists/list-routes.js';
 import { flexgetRoutes } from './flexget/flexget-routes.js';
 import { traktRoutes } from './trakt/trakt-routes.js';
+import { plexRoutes } from './plex/plex-routes.js';
 import { startTraktSyncScheduler } from './trakt/trakt-scheduler.js';
 
 const logger = LOGGER.child({ module: 'index' });
@@ -65,9 +66,11 @@ await server.register(tvRoutes, { prefix: '/api/tv' });
 await server.register(listRoutes, { prefix: '/api/lists' });
 await server.register(flexgetRoutes, { prefix: '/api/flexget' });
 await server.register(traktRoutes, { prefix: '/api/trakt' });
+await server.register(plexRoutes, { prefix: '/api/plex' });
 
 server.get('/health', () => ({ status: 'ok' }));
 
 await server.listen({ port: config.PORT, host: '0.0.0.0' });
 logger.info(`Server listening on port ${config.PORT}`);
+
 startTraktSyncScheduler();

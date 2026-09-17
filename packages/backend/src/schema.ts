@@ -16,6 +16,8 @@ export const envSchema = z
     FLEXGET_ALLOW_INSECURE_TLS: z.coerce.boolean().default(false),
     TRAKT_CLIENT_ID: z.string().min(1).optional(),
     TRAKT_CLIENT_SECRET: z.string().min(1).optional(),
+    PLEX_SERVER_URL: z.string().url().optional(),
+    PLEX_SERVER_TOKEN: z.string().min(1).optional(),
   })
   .transform(raw => ({
     NODE_ENV: raw.NODE_ENV,
@@ -28,6 +30,8 @@ export const envSchema = z
     FLEXGET_ALLOW_INSECURE_TLS: raw.FLEXGET_ALLOW_INSECURE_TLS,
     TRAKT_CLIENT_ID: raw.TRAKT_CLIENT_ID,
     TRAKT_CLIENT_SECRET: raw.TRAKT_CLIENT_SECRET,
+    PLEX_SERVER_URL: raw.PLEX_SERVER_URL,
+    PLEX_SERVER_TOKEN: raw.PLEX_SERVER_TOKEN,
     isDevelopment: raw.NODE_ENV !== 'production',
   }));
 

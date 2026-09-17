@@ -183,5 +183,92 @@ export function createTvWatchService(options?: ServiceOptions) {
         },
       });
     },
+
+    async createEpisodeWatchEntryIfMissingForDay(
+      seriesTmdbId: string,
+      seasonNumber: number,
+      episodeNumber: number,
+      userId: number,
+      watchedAt: Date,
+      source: WatchSource = DEFAULT_WATCH_SOURCE
+    ) {
+      const logger = localLogger('createEpisodeWatchEntryIfMissingForDay');
+      logger.debug(
+        { seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source },
+        'Creating TV watch entry only if missing for this day'
+      );
+
+      const dayStart = new Date(watchedAt);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const existingForDay = await prisma.tvWatchHistory.findFirst({
+        where: {
+          seriesTmdbId,
+          seasonNumber,
+          episodeNumber,
+          userId,
+          watchedAt: { gte: dayStart, lt: dayEnd },
+        },
+      });
+
+      if (existingForDay) return existingForDay;
+
+      const existingEntry = await prisma.tvWatchEntry.findUnique({
+        where: {
+          seriesTmdbId_seasonNumber_episodeNumber_userId: {
+            seriesTmdbId,
+            seasonNumber,
+            episodeNumber,
+            userId,
+          },
+        },
+      });
+
+      if (!existingEntry) {
+        return prisma.tvWatchEntry.create({
+          data: {
+            seriesTmdbId,
+            seasonNumber,
+            episodeNumber,
+            userId,
+            latestWatchedAt: watchedAt,
+            source,
+            watchHistory: {
+              create: [{ seriesTmdbId, seasonNumber, episodeNumber, userId, watchedAt, source }],
+            },
+          },
+        });
+      }
+
+      await prisma.tvWatchHistory.create({
+        data: {
+          seriesTmdbId,
+          seasonNumber,
+          episodeNumber,
+          userId,
+          watchedAt,
+          source,
+          tvWatchEntryId: existingEntry.id,
+        },
+      });
+
+      if (watchedAt > existingEntry.latestWatchedAt) {
+        return prisma.tvWatchEntry.update({
+          where: {
+            seriesTmdbId_seasonNumber_episodeNumber_userId: {
+              seriesTmdbId,
+              seasonNumber,
+              episodeNumber,
+              userId,
+            },
+          },
+          data: { latestWatchedAt: watchedAt, source },
+        });
+      }
+
+      return existingEntry;
+    },
   };
 }

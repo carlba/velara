@@ -59,6 +59,43 @@ npm run lint
 # Run tests
 npm test
 
+## Plex integration
+
+Velara can record movies and episodes as watched automatically when Plex
+finishes playing them, via a Plex webhook.
+
+1. Log in to Velara in your browser, then open the browser console on any
+   Velara page and run:
+
+   ```js
+   await fetch('/api/plex/integration', { method: 'POST', credentials: 'include' })
+     .then(r => r.json())
+   ```
+
+   This reuses your existing login session cookie automatically. The
+   response includes a `webhookToken`. Your webhook URL is:
+
+   ```
+   http://<velara-backend-host>:3070/api/plex/webhook/<webhookToken>
+   ```
+
+2. In Plex, go to **Settings → Webhooks** (requires Plex Pass) and add the
+   URL above.
+
+3. Play a movie or episode to completion in Plex. Velara listens for
+   `media.scrobble` events and marks the corresponding title as watched,
+   matching it by TMDB, IMDb, or TheTVDB id embedded in the Plex metadata.
+
+Notes:
+
+- The webhook URL contains a secret token and is not otherwise
+  authenticated — treat it like a password and rotate it (`POST
+  /api/plex/integration` again) if it leaks.
+- Remove the integration with `DELETE /api/plex/integration`.
+- Since Plex webhooks don't include a real watch history, Velara dedupes
+  by user and by day, so repeated or duplicate scrobble events for the same
+  title on the same day won't create extra watch history entries.
+
 ## Database dump and restore
 The database dump and restore commands execute `pg_dump` and `psql` inside the `postgres` container from the repository Docker Compose setup.
 

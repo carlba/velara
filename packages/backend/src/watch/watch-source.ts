@@ -1,6 +1,7 @@
 export enum WatchSource {
   Manual = 'manual',
   Trakt = 'trakt',
+  Plex = 'plex',
   FilmtipsetComments = 'filmtipset.comments',
   FilmtipsetRatings = 'filmtipset.ratings',
 }
