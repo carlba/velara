@@ -66,7 +66,7 @@ This file has two parts:
 - Cover edge cases and error paths, not just the happy path.
 
 - Each package runs its own Vitest config — there is no aggregated root test runner beyond
-  `pnpm -r run test`.
+  `npm run test`.
 
 ## Error handling
 
@@ -80,8 +80,8 @@ This file has two parts:
 
 Before considering a change done:
 
-1. `pnpm run lint`, `pnpm run test`, `pnpm run build` from root (or the `pnpm --filter <pkg> ...`
-   equivalents when working in a single package).
+1. `npm run lint`, `npm run test`, `npm run build` from root equivalents when working in a single
+   package).
 
 2. Update `README.md` if the change affects documented usage or structure.
 

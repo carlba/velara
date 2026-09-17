@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Film, List, LogOut, Tv, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ThemeToggle from '@/components/layout/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Header() {
@@ -39,6 +40,7 @@ export default function Header() {
               <span className="hidden sm:inline">Lists</span>
             </Link>
           </Button>
+          <ThemeToggle />
           {user ? (
             <>
               <Button variant="ghost" size="sm" asChild>
