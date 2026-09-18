@@ -39,6 +39,10 @@ export const plexRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
     return reply.code(204).send();
   });
 
+  fastify.get('/now-playing', { preHandler: authenticate }, async (request, reply) => {
+    return reply.send(plexService.getNowPlaying(request.user.userId));
+  });
+
   fastify.post(
     '/webhook/:token',
     { schema: { params: webhookParamsSchema } },

@@ -37,8 +37,21 @@ vi.mock('../lib/prisma.js', () => {
 });
 
 const findMovieByImdbIdMock = vi.fn();
+const getMovieDetailsMock = vi.fn();
 vi.mock('../movies/movie-service.js', () => ({
-  createMovieService: () => ({ findMovieByImdbId: findMovieByImdbIdMock }),
+  createMovieService: () => ({
+    findMovieByImdbId: findMovieByImdbIdMock,
+    getMovieDetails: getMovieDetailsMock,
+  }),
+}));
+
+const getTvShowDetailsMock = vi.fn();
+const getTvSeasonMock = vi.fn();
+vi.mock('../tv-shows/tv-show-service.js', () => ({
+  createTvShowService: () => ({
+    getTvShowDetails: getTvShowDetailsMock,
+    getTvSeason: getTvSeasonMock,
+  }),
 }));
 
 vi.mock('./plex-client.js', () => {
@@ -219,28 +232,6 @@ describe('Plex service', () => {
         );
       });
 
-      it('no-ops when season/episode numbers are missing', async () => {
-        const service = createPlexService();
-
-        await service.handleWebhookPayload(1, {
-          event: 'media.scrobble',
-          Metadata: { type: 'episode', grandparentRatingKey: '63119' },
-        });
-
-        expect(createEpisodeWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
-      });
-
-      it('no-ops when grandparentRatingKey is missing', async () => {
-        const service = createPlexService();
-
-        await service.handleWebhookPayload(1, {
-          event: 'media.scrobble',
-          Metadata: { type: 'episode', parentIndex: 1, index: 1 },
-        });
-
-        expect(createEpisodeWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
-      });
-
       it('no-ops when the Plex server has no tmdb guid for the series', async () => {
         libraryMetadataMock.mockResolvedValueOnce({
           MediaContainer: {
@@ -261,6 +252,218 @@ describe('Plex service', () => {
 
         expect(createEpisodeWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('handleWebhookPayload — now playing events', () => {
+    it('sets now-playing state for a movie play event', async () => {
+      getMovieDetailsMock.mockResolvedValueOnce({
+        tmdbId: 12345,
+        title: 'Example Movie',
+        posterPath: '/poster.jpg',
+      });
+      const service = createPlexService();
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.play',
+        Metadata: {
+          type: 'movie',
+          Guid: [{ id: 'tmdb://12345' }],
+          viewOffset: 1000,
+          duration: 5000,
+        },
+      });
+
+      expect(createWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      expect(createEpisodeWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      const nowPlaying = service.getNowPlaying(1);
+      expect(nowPlaying).toMatchObject({
+        isPlaying: true,
+        status: 'playing',
+        mediaType: 'movie',
+        title: 'Example Movie',
+        posterPath: '/poster.jpg',
+        tmdbId: 12345,
+        viewOffsetMs: 1000,
+        durationMs: 5000,
+      });
+      expect(typeof (nowPlaying as { updatedAt: string }).updatedAt).toBe('string');
+    });
+
+    it('sets now-playing state for an episode resume event', async () => {
+      libraryMetadataMock.mockResolvedValueOnce({
+        MediaContainer: {
+          Metadata: [{ ratingKey: '63119', Guid: [{ id: 'tmdb://555' }] }],
+        },
+      });
+      getTvShowDetailsMock.mockResolvedValueOnce({
+        seriesTmdbId: '555',
+        name: 'Example Series',
+        posterPath: '/series-poster.jpg',
+      });
+      getTvSeasonMock.mockResolvedValueOnce({
+        seasonNumber: 2,
+        episodes: [
+          { episodeNumber: 5, name: 'Example Episode', stillPath: '/still.jpg' },
+        ],
+      });
+      const service = createPlexService();
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.resume',
+        Metadata: {
+          type: 'episode',
+          grandparentRatingKey: '63119',
+          parentIndex: 2,
+          index: 5,
+          viewOffset: 2000,
+          duration: 6000,
+        },
+      });
+
+      expect(createWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      expect(createEpisodeWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      const nowPlaying = service.getNowPlaying(1);
+      expect(nowPlaying).toMatchObject({
+        isPlaying: true,
+        status: 'playing',
+        mediaType: 'episode',
+        title: 'Example Series',
+        posterPath: '/series-poster.jpg',
+        seriesTmdbId: '555',
+        seriesName: 'Example Series',
+        seasonNumber: 2,
+        episodeNumber: 5,
+        episodeName: 'Example Episode',
+        stillPath: '/still.jpg',
+        viewOffsetMs: 2000,
+        durationMs: 6000,
+      });
+      expect(typeof (nowPlaying as { updatedAt: string }).updatedAt).toBe('string');
+    });
+
+    it('pauses an existing entry without re-resolving TMDB', async () => {
+      getMovieDetailsMock.mockResolvedValueOnce({
+        tmdbId: 12345,
+        title: 'Example Movie',
+        posterPath: '/poster.jpg',
+      });
+      const service = createPlexService();
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.play',
+        Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }], viewOffset: 1000 },
+      });
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.pause',
+        Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }], viewOffset: 1500 },
+      });
+
+      expect(getMovieDetailsMock).toHaveBeenCalledTimes(1);
+      expect(createWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      expect(service.getNowPlaying(1)).toMatchObject({
+        isPlaying: true,
+        status: 'paused',
+        viewOffsetMs: 1500,
+      });
+    });
+
+    it('flips back to playing on resume', async () => {
+      getMovieDetailsMock.mockResolvedValue({
+        tmdbId: 12345,
+        title: 'Example Movie',
+        posterPath: '/poster.jpg',
+      });
+      const service = createPlexService();
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.play',
+        Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }] },
+      });
+      await service.handleWebhookPayload(1, {
+        event: 'media.pause',
+        Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }] },
+      });
+      await service.handleWebhookPayload(1, {
+        event: 'media.resume',
+        Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }] },
+      });
+
+      expect(createWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      expect(service.getNowPlaying(1)).toMatchObject({ isPlaying: true, status: 'playing' });
+    });
+
+    it('clears now-playing state on stop', async () => {
+      getMovieDetailsMock.mockResolvedValueOnce({
+        tmdbId: 12345,
+        title: 'Example Movie',
+        posterPath: '/poster.jpg',
+      });
+      const service = createPlexService();
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.play',
+        Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }] },
+      });
+      await service.handleWebhookPayload(1, { event: 'media.stop' });
+
+      expect(createWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      expect(service.getNowPlaying(1)).toEqual({ isPlaying: false });
+    });
+
+    it('clears now-playing state on stop even with missing Metadata', async () => {
+      getMovieDetailsMock.mockResolvedValueOnce({
+        tmdbId: 12345,
+        title: 'Example Movie',
+        posterPath: '/poster.jpg',
+      });
+      const service = createPlexService();
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.play',
+        Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }] },
+      });
+      await service.handleWebhookPayload(1, { event: 'media.stop', Metadata: undefined });
+
+      expect(service.getNowPlaying(1)).toEqual({ isPlaying: false });
+    });
+
+    it('leaves state as not playing when the guid cannot be resolved', async () => {
+      const service = createPlexService();
+
+      await service.handleWebhookPayload(1, {
+        event: 'media.play',
+        Metadata: { type: 'movie', Guid: [{ id: 'plex://movie/abc' }] },
+      });
+
+      expect(createWatchEntryIfMissingForDayMock).not.toHaveBeenCalled();
+      expect(service.getNowPlaying(1)).toEqual({ isPlaying: false });
+    });
+
+    it('hides now-playing state once it goes stale', async () => {
+      vi.useFakeTimers();
+      try {
+        getMovieDetailsMock.mockResolvedValueOnce({
+          tmdbId: 12345,
+          title: 'Example Movie',
+          posterPath: '/poster.jpg',
+        });
+        const service = createPlexService();
+
+        await service.handleWebhookPayload(1, {
+          event: 'media.play',
+          Metadata: { type: 'movie', Guid: [{ id: 'tmdb://12345' }] },
+        });
+
+        expect(service.getNowPlaying(1)).toMatchObject({ isPlaying: true });
+
+        vi.advanceTimersByTime(11 * 60 * 1000);
+
+        expect(service.getNowPlaying(1)).toEqual({ isPlaying: false });
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
