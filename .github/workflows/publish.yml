@@ -4,6 +4,9 @@ name: Build and Publish Docker Container
 # Run manually when Docker publishing is needed.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 # The default permissions of the auto generated `GITHUB_TOKEN` only allows read access this will ensure
 # that write access is also available. More information
@@ -39,4 +42,6 @@ jobs:
           context: ./packages/${{ matrix.package }}
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-${{ matrix.package }}:latest
+          tags:
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-${{
+            matrix.package }}:latest
