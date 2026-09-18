@@ -65,6 +65,7 @@ export const plexRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =>
             { fieldname: part.fieldname, filename: part.filename },
             'Discarding unexpected file part on Plex webhook'
           );
+          await part.toBuffer();
           continue;
         }
 
