@@ -44,7 +44,7 @@ The backend runs on `http://localhost:3070` and the frontend on `http://localhos
 
 ## Usage
 
-````bash
+```bash
 # Generate backend Prisma client (required after install or schema changes)
 cd packages/backend && npm run db:generate
 
@@ -56,26 +56,25 @@ npm run lint
 
 # Run tests
 npm test
+```
 
 ## Plex integration
 
-Velara can record movies and episodes as watched automatically when Plex
-finishes playing them, via a Plex webhook.
+Velara can record movies and episodes as watched automatically when Plex finishes playing them, via
+a Plex webhook.
 
-1. Log in to Velara in your browser, then open the browser console on any
-   Velara page and run:
+1. Log in to Velara in your browser, then open the browser console on any Velara page and run:
 
    ```js
-   await fetch('/api/plex/integration', { method: 'POST', credentials: 'include' })
-     .then(r => r.json())
-````
+   await fetch('/api/plex/integration', { method: 'POST', credentials: 'include' }).then(r =>
+     r.json()
+   );
+   ```
 
 This reuses your existing login session cookie automatically. The response includes a
 `webhookToken`. Your webhook URL is:
 
-```
-http://<velara-backend-host>:3070/api/plex/webhook/<webhookToken>
-```
+`http://<velara-backend-host>:3070/api/plex/webhook/<webhookToken>`
 
 2. In Plex, go to **Settings → Webhooks** (requires Plex Pass) and add the URL above.
 
@@ -91,6 +90,10 @@ Notes:
 - Since Plex webhooks don't include a real watch history, Velara dedupes by user and by day, so
   repeated or duplicate scrobble events for the same title on the same day won't create extra watch
   history entries.
+
+### Webhooks
+
+1. [Plex Webhooks](https://app.plex.tv/desktop/#!/settings/webhooks)
 
 ## Database dump and restore
 

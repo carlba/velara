@@ -135,6 +135,8 @@ When adding a new domain feature, follow the existing folder shape: `<domain>-ty
 
 - Prefer named exports over default exports.
 
+- Prefer functional iteration map, filter, find, reduce over for loops
+
 ### Naming conventions
 
 | Construct              | Convention                      | Example                                 |
