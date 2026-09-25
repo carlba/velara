@@ -24,14 +24,11 @@ export function parsePlexGuid(guid: string): ParsedPlexGuid | null {
 export function findGuid(guids: PlexGuid[] | undefined, source: PlexGuidSource): string | null {
   if (!guids) return null;
 
-  for (const guid of guids) {
-    const parsed = parsePlexGuid(guid.id);
-    if (parsed?.source === source) {
-      return parsed.id;
-    }
-  }
+  const parsed = guids
+    .map((guid) => parsePlexGuid(guid.id))
+    .find((parsedGuid) => parsedGuid?.source === source);
 
-  return null;
+  return parsed?.id ?? null;
 }
 
 function isSupportedGuidSource(source: string): source is PlexGuidSource {
