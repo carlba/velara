@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { MyRatingPill } from '@/components/MyRatingPill';
 import StarRating from '@/components/movies/StarRating';
 import ListActionPanel from '@/components/lists/ListActionPanel';
 import { useMovieDetails } from '@/hooks/useMovieDetails';
@@ -179,6 +180,7 @@ export default function MovieDetailsPage() {
                   color="bg-red-500"
                 />
               )}
+              {user && userRating !== null && <MyRatingPill score={userRating} />}
             </div>
           </div>
         </div>
