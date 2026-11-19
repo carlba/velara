@@ -7,6 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import StarRating from '@/components/movies/StarRating';
 import ListActionPanel from '@/components/lists/ListActionPanel';
 import SeasonSection from '@/components/tv-shows/SeasonSection';
@@ -19,6 +26,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatDateTime } from '@/lib/utils';
 import type { TvShowDetail, TvEpisode } from '@/types/tv-show';
 
+const HISTORY_LIMIT_ALL = 'all';
+const DEFAULT_HISTORY_LIMIT = '10';
+const HISTORY_LIMIT_OPTIONS = ['10', '20', '30', HISTORY_LIMIT_ALL];
+
 export default function TvShowDetailsPage() {
   const { seriesId } = useParams<{ seriesId: string }>();
   const id = seriesId ?? '';
@@ -30,6 +41,7 @@ export default function TvShowDetailsPage() {
   const mutations = useUserTvData(id);
   const [reviewText, setReviewText] = useState<string | undefined>(undefined);
   const [commentText, setCommentText] = useState('');
+  const [historyLimit, setHistoryLimit] = useState<string>(DEFAULT_HISTORY_LIMIT);
   const [beginError, setBeginError] = useState<string | null>(null);
 
   const setSeriesBeginMutation = useMutation<
@@ -134,7 +146,11 @@ export default function TvShowDetailsPage() {
     setReviewText(undefined);
   };
 
-  const recentWatchHistory = userData?.watchHistory?.slice(0, 10) ?? [];
+  const fullWatchHistory = userData?.watchHistory ?? [];
+  const recentWatchHistory =
+    historyLimit === HISTORY_LIMIT_ALL
+      ? fullWatchHistory
+      : fullWatchHistory.slice(0, Number(historyLimit));
 
   const handlePostComment = () => {
     const trimmed = commentText.trim();
@@ -320,9 +336,23 @@ export default function TvShowDetailsPage() {
             <div className="rounded-2xl border bg-card p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Watch history</p>
-                <span className="text-xs text-muted-foreground">
-                  Last {recentWatchHistory.length} event{recentWatchHistory.length !== 1 ? 's' : ''}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Showing {recentWatchHistory.length} of {fullWatchHistory.length}
+                  </span>
+                  <Select value={historyLimit} onValueChange={setHistoryLimit}>
+                    <SelectTrigger className="h-8 w-24" aria-label="Watch history items to show">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HISTORY_LIMIT_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option === HISTORY_LIMIT_ALL ? 'All' : option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                 {recentWatchHistory.map((entry, index) => (
