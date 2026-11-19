@@ -7,6 +7,7 @@ export interface TvShowListItem {
   voteCount: number;
   firstAirDate: string;
   overview: string;
+  myRating?: number;
 }
 
 export interface ExternalTvRatings {

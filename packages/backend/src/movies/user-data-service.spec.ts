@@ -53,4 +53,31 @@ describe('user data service', () => {
 
     expect(result).toEqual([1]);
   });
+
+  it('maps tmdb ids to the user score for rated movies only', async () => {
+    ratingFindManyMock.mockResolvedValue([
+      { tmdbId: 42, score: 8 },
+      { tmdbId: 7, score: 3 },
+    ]);
+
+    const { createUserDataService } = await import('./user-data-service.js');
+    const service = createUserDataService({ logger: loggerMock });
+
+    const result = await service.getMyRatings(5, [42, 7, 100]);
+
+    expect(result).toEqual({ 42: 8, 7: 3 });
+    expect(ratingFindManyMock).toHaveBeenCalledWith({
+      where: { userId: 5, tmdbId: { in: [42, 7, 100] } },
+      select: { tmdbId: true, score: true },
+    });
+  });
+
+  it('returns an empty map when none of the movies are rated', async () => {
+    ratingFindManyMock.mockResolvedValue([]);
+
+    const { createUserDataService } = await import('./user-data-service.js');
+    const service = createUserDataService({ logger: loggerMock });
+
+    expect(await service.getMyRatings(5, [1])).toEqual({});
+  });
 });

@@ -66,6 +66,8 @@ export interface TvShowListItem {
   voteCount: number;
   firstAirDate: string;
   overview: string;
+  /** The requesting user's own show-level score (1-10); omitted when anonymous or unrated. */
+  myRating?: number;
 }
 
 export interface TvShowListResponse {

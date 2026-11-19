@@ -1,6 +1,6 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { authenticate } from '../auth/auth-middleware.js';
+import { authenticate, getOptionalUserId } from '../auth/auth-middleware.js';
 import { createMovieService } from './movie-service.js';
 import { createUserDataService } from './user-data-service.js';
 import { createWatchService } from '../watch/watch-service.js';
@@ -10,7 +10,7 @@ import { createCommentService } from '../comments/comment-service.js';
 import { importFromFilmtipset, importFromTraktDump } from './import-service.js';
 import { createExportService } from './export-service.js';
 import { USER_FILTER_VALUES } from './movie-types.js';
-import type { SortBy, UserFilterValue } from './movie-types.js';
+import type { MovieListItem, MovieListResponse, SortBy, UserFilterValue } from './movie-types.js';
 
 const PAGE_SIZE = 20;
 
@@ -60,9 +60,28 @@ const SORT_REQUIRED_FILTER: Partial<Record<SortBy, UserFilterValue>> = {
   my_rating: 'rated',
 };
 
+async function withMyRatings(
+  list: MovieListResponse,
+  userId: number | null,
+  userDataService: ReturnType<typeof createUserDataService>
+): Promise<MovieListResponse> {
+  if (userId === null || list.results.length === 0) return list;
+
+  const myRatings = await userDataService.getMyRatings(
+    userId,
+    list.results.map(movie => movie.tmdbId)
+  );
+  const results: MovieListItem[] = list.results.map(movie => ({
+    ...movie,
+    ...(myRatings[movie.tmdbId] !== undefined && { myRating: myRatings[movie.tmdbId] }),
+  }));
+  return { ...list, results };
+}
+
 export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
   fastify.get('/', { schema: { querystring: listQuerySchema } }, async (request, reply) => {
     const { tmdb_id, search, page, sort_by, user_filter } = request.query;
+    const userDataService = createUserDataService({ logger: request.log });
 
     const requiredFilter = SORT_REQUIRED_FILTER[sort_by];
     if (requiredFilter !== undefined && !user_filter?.includes(requiredFilter)) {
@@ -74,13 +93,16 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
     if (tmdb_id !== undefined) {
       const movieService = createMovieService({ logger: request.log });
       const movie = await movieService.getMovieById(tmdb_id);
-      return reply.send({ results: [movie], page: 1, total_pages: 1, total_results: 1 });
+      const userId = await getOptionalUserId(request);
+      const single = { results: [movie], page: 1, total_pages: 1, total_results: 1 };
+      return reply.send(await withMyRatings(single, userId, userDataService));
     }
 
     if (search) {
       const movieService = createMovieService({ logger: request.log });
       const data = await movieService.searchMovies(search, page);
-      return reply.send(data);
+      const userId = await getOptionalUserId(request);
+      return reply.send(await withMyRatings(data, userId, userDataService));
     }
 
     if (user_filter && user_filter.length > 0) {
@@ -90,7 +112,6 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const userDataService = createUserDataService({ logger: request.log });
       const tmdbIds = await userDataService.getFilteredTmdbIds(
         request.user.userId,
         user_filter,
@@ -106,12 +127,14 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
       const pageIds = tmdbIds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
       const movieService = createMovieService({ logger: request.log });
       const results = await Promise.all(pageIds.map(id => movieService.getMovieById(id)));
-      return reply.send({ results, page, total_pages: totalPages, total_results: totalResults });
+      const list = { results, page, total_pages: totalPages, total_results: totalResults };
+      return reply.send(await withMyRatings(list, request.user.userId, userDataService));
     }
 
     const movieService = createMovieService({ logger: request.log });
     const data = await movieService.discoverMovies(sort_by, page);
-    return reply.send(data);
+    const userId = await getOptionalUserId(request);
+    return reply.send(await withMyRatings(data, userId, userDataService));
   });
 
   fastify.get('/export/letterboxd', { preHandler: authenticate }, async (request, reply) => {

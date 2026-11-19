@@ -92,4 +92,19 @@ describe('TV user data service', () => {
       },
     ]);
   });
+
+  it('maps series ids to the show-level user score only', async () => {
+    findManyMock.mockResolvedValueOnce([{ seriesTmdbId: '1399', score: 9 }]);
+
+    const { createTvUserDataService } = await import('./tv-user-data-service.js');
+    const service = createTvUserDataService({ logger: loggerMock });
+
+    const result = await service.getMyShowRatings(5, ['1399', '1400']);
+
+    expect(result).toEqual({ '1399': 9 });
+    expect(findManyMock).toHaveBeenCalledWith({
+      where: { userId: 5, seasonNumber: 0, seriesTmdbId: { in: ['1399', '1400'] } },
+      select: { seriesTmdbId: true, score: true },
+    });
+  });
 });

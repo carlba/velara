@@ -14,6 +14,8 @@ export function useUserMovieData(tmdbId: number) {
   const queryKey = ['user-movie-data', tmdbId];
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey });
+  // Overview cards carry the user's rating inside the list response.
+  const invalidateOverviewRatings = () => queryClient.invalidateQueries({ queryKey: ['movies'] });
 
   const markWatched = useMutation({
     mutationFn: (watchedAt: string) => updateWatch(tmdbId, watchedAt),
@@ -38,6 +40,7 @@ export function useUserMovieData(tmdbId: number) {
     onSuccess: () => {
       toast.success('Rating saved');
       void invalidate();
+      void invalidateOverviewRatings();
     },
     onError: () => toast.error('Failed to save rating'),
   });
@@ -47,6 +50,7 @@ export function useUserMovieData(tmdbId: number) {
     onSuccess: () => {
       toast.success('Rating removed');
       void invalidate();
+      void invalidateOverviewRatings();
     },
     onError: () => toast.error('Failed to remove rating'),
   });

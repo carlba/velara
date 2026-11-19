@@ -12,6 +12,7 @@ import type {
   TmdbTvSeasonDetail,
   OmdbTvResponse,
   TvShowListItem,
+  TvShowListResponse,
   TvShowDetail,
   TvSeason,
   TvEpisode,
@@ -77,7 +78,7 @@ export function createTvShowService(options?: ServiceOptions) {
     }
   }
 
-  async function searchTvShows(query: string, page = 1): Promise<TmdbTvSearchResponse> {
+  async function searchTvShows(query: string, page = 1): Promise<TvShowListResponse> {
     const logger = localLogger('searchTvShows');
 
     try {
@@ -88,7 +89,7 @@ export function createTvShowService(options?: ServiceOptions) {
         .json<TmdbTvSearchResponse>();
       return {
         ...response,
-        results: response.results.map(mapListItem) as unknown as TmdbTvListResult[],
+        results: response.results.map(mapListItem),
       };
     } catch (error) {
       logger.error({ query, page, err: error }, 'TMDB TV search failed');
@@ -102,7 +103,7 @@ export function createTvShowService(options?: ServiceOptions) {
   async function discoverTvShows(
     sortBy: TvSortBy = 'popularity',
     page = 1
-  ): Promise<TmdbTvSearchResponse> {
+  ): Promise<TvShowListResponse> {
     const logger = localLogger('discoverTvShows');
     const tmdbSortBy = sortBy === 'rating' ? 'vote_average.desc' : 'popularity.desc';
 
@@ -119,7 +120,7 @@ export function createTvShowService(options?: ServiceOptions) {
         .json<TmdbTvSearchResponse>();
       return {
         ...response,
-        results: response.results.map(mapListItem) as unknown as TmdbTvListResult[],
+        results: response.results.map(mapListItem),
       };
     } catch (error) {
       logger.error({ sortBy, page, err: error }, 'TMDB TV discover failed');

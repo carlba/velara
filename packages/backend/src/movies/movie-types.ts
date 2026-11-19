@@ -54,6 +54,15 @@ export interface MovieListItem {
   voteCount: number;
   releaseDate: string;
   overview: string;
+  /** The requesting user's own score (1-10); omitted when anonymous or unrated. */
+  myRating?: number;
+}
+
+export interface MovieListResponse {
+  results: MovieListItem[];
+  page: number;
+  total_pages: number;
+  total_results: number;
 }
 
 export interface ExternalRatings {
