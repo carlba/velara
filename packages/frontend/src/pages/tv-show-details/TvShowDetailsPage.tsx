@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MyRatingPill } from '@/components/MyRatingPill';
 import StarRating from '@/components/movies/StarRating';
 import ListActionPanel from '@/components/lists/ListActionPanel';
 import SeasonSection from '@/components/tv-shows/SeasonSection';
@@ -266,6 +267,7 @@ export default function TvShowDetailsPage() {
                   color="bg-red-500"
                 />
               )}
+              {user && userShowRating !== null && <MyRatingPill score={userShowRating} />}
             </div>
           </div>
         </div>
