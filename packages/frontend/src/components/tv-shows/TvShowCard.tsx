@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { MyRatingBadge } from '@/components/MyRatingBadge';
 import type { TvShowListItem } from '@/types/tv-show';
 
 interface TvShowCardProps {
@@ -36,13 +37,14 @@ export default function TvShowCard({ show }: TvShowCardProps) {
           {year && <p className="text-xs text-white/70 mt-0.5">{year}</p>}
         </div>
 
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
           <Badge
             variant="secondary"
             className="flex items-center gap-1 bg-black/70 text-yellow-400 border-0 backdrop-blur-sm">
             <Star className="h-3 w-3 fill-yellow-400" />
             {rating}
           </Badge>
+          {show.myRating !== undefined && <MyRatingBadge score={show.myRating} />}
         </div>
       </div>
     </Link>

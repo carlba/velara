@@ -7,6 +7,7 @@ export interface MovieListItem {
   voteCount: number;
   releaseDate: string;
   overview: string;
+  myRating?: number;
 }
 
 export interface ExternalRatings {

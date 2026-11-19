@@ -91,6 +91,17 @@ export function createUserDataService(options?: ServiceOptions) {
       return Array.from(new Set(idSets.flat()));
     },
 
+    async getMyRatings(userId: number, tmdbIds: number[]): Promise<Record<number, number>> {
+      const logger = localLogger('getMyRatings');
+      logger.debug({ userId, count: tmdbIds.length }, 'Loading user ratings for movies');
+
+      const ratings = await prisma.rating.findMany({
+        where: { userId, tmdbId: { in: tmdbIds } },
+        select: { tmdbId: true, score: true },
+      });
+      return Object.fromEntries(ratings.map(rating => [rating.tmdbId, rating.score]));
+    },
+
     async getUserMovieData(tmdbId: number, userId: number) {
       const logger = localLogger('getUserMovieData');
       logger.debug({ tmdbId, userId }, 'Loading user movie data');

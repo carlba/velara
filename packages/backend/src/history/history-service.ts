@@ -5,7 +5,6 @@ import { prisma } from '../lib/prisma.js';
 import { HttpError } from '../lib/http-error.js';
 import { createMovieService } from '../movies/movie-service.js';
 import { createTvShowService } from '../tv-shows/tv-show-service.js';
-import type { MovieListItem } from '../movies/movie-types.js';
 import type { HistoryItem, HistoryTypeFilter } from './history-types.js';
 
 type ServiceLogger = Logger | FastifyBaseLogger;
@@ -82,9 +81,7 @@ export function createHistoryService(options?: ServiceOptions) {
     const movieEntries = await Promise.all(
       distinctTmdbIds.map(async tmdbId => {
         try {
-          // getMovieById's declared return type is stale (TMDB snake_case); the runtime
-          // value is actually MovieListItem-shaped (mapListItem() converts it).
-          const movie = (await movieService.getMovieById(tmdbId)) as unknown as MovieListItem;
+          const movie = await movieService.getMovieById(tmdbId);
           return [tmdbId, movie] as const;
         } catch (error) {
           logger.warn({ tmdbId, err: error }, 'Failed to fetch movie for history item');

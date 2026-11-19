@@ -1,6 +1,6 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { authenticate } from '../auth/auth-middleware.js';
+import { authenticate, getOptionalUserId } from '../auth/auth-middleware.js';
 import { createTvShowService } from './tv-show-service.js';
 import { createTvUserDataService } from './tv-user-data-service.js';
 import { createTvWatchService } from './tv-watch-service.js';
@@ -8,7 +8,12 @@ import { createTvRatingService } from './tv-rating-service.js';
 import { createTvReviewService } from './tv-review-service.js';
 import { createTvCommentService } from './tv-comment-service.js';
 import { TV_USER_FILTER_VALUES } from './tv-show-types.js';
-import type { TvSortBy, TvUserFilterValue } from './tv-show-types.js';
+import type {
+  TvShowListItem,
+  TvShowListResponse,
+  TvSortBy,
+  TvUserFilterValue,
+} from './tv-show-types.js';
 
 const PAGE_SIZE = 20;
 
@@ -64,9 +69,28 @@ const SORT_REQUIRED_FILTER: Partial<Record<TvSortBy, TvUserFilterValue>> = {
   my_rating: 'rated',
 };
 
+async function withMyRatings(
+  list: TvShowListResponse,
+  userId: number | null,
+  userDataService: ReturnType<typeof createTvUserDataService>
+): Promise<TvShowListResponse> {
+  if (userId === null || list.results.length === 0) return list;
+
+  const myRatings = await userDataService.getMyShowRatings(
+    userId,
+    list.results.map(show => show.seriesTmdbId)
+  );
+  const results: TvShowListItem[] = list.results.map(show => ({
+    ...show,
+    ...(myRatings[show.seriesTmdbId] !== undefined && { myRating: myRatings[show.seriesTmdbId] }),
+  }));
+  return { ...list, results };
+}
+
 export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
   fastify.get('/', { schema: { querystring: listQuerySchema } }, async (request, reply) => {
     const { series_id, search, page, sort_by, user_filter } = request.query;
+    const userDataService = createTvUserDataService({ logger: request.log });
 
     const requiredFilter = SORT_REQUIRED_FILTER[sort_by];
     if (requiredFilter !== undefined && !user_filter?.includes(requiredFilter)) {
@@ -78,13 +102,16 @@ export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
     if (series_id !== undefined) {
       const tvService = createTvShowService({ logger: request.log });
       const show = await tvService.getTvShowById(series_id);
-      return reply.send({ results: [show], page: 1, total_pages: 1, total_results: 1 });
+      const userId = await getOptionalUserId(request);
+      const single = { results: [show], page: 1, total_pages: 1, total_results: 1 };
+      return reply.send(await withMyRatings(single, userId, userDataService));
     }
 
     if (search) {
       const tvService = createTvShowService({ logger: request.log });
       const data = await tvService.searchTvShows(search, page);
-      return reply.send(data);
+      const userId = await getOptionalUserId(request);
+      return reply.send(await withMyRatings(data, userId, userDataService));
     }
 
     if (user_filter && user_filter.length > 0) {
@@ -94,7 +121,6 @@ export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const userDataService = createTvUserDataService({ logger: request.log });
       const seriesIds = await userDataService.getFilteredSeriesTmdbIds(
         request.user.userId,
         user_filter,
@@ -110,12 +136,14 @@ export const tvRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
       const pageIds = seriesIds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
       const tvService = createTvShowService({ logger: request.log });
       const results = await Promise.all(pageIds.map(id => tvService.getTvShowById(id)));
-      return reply.send({ results, page, total_pages: totalPages, total_results: totalResults });
+      const list = { results, page, total_pages: totalPages, total_results: totalResults };
+      return reply.send(await withMyRatings(list, request.user.userId, userDataService));
     }
 
     const tvService = createTvShowService({ logger: request.log });
     const data = await tvService.discoverTvShows(sort_by, page);
-    return reply.send(data);
+    const userId = await getOptionalUserId(request);
+    return reply.send(await withMyRatings(data, userId, userDataService));
   });
 
   fastify.get('/:seriesId', { schema: { params: seriesParamsSchema } }, async (request, reply) => {

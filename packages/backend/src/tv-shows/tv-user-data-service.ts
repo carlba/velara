@@ -99,6 +99,21 @@ export function createTvUserDataService(options?: ServiceOptions) {
       return Array.from(new Set(idSets.flat()));
     },
 
+    async getMyShowRatings(
+      userId: number,
+      seriesTmdbIds: string[]
+    ): Promise<Record<string, number>> {
+      const logger = localLogger('getMyShowRatings');
+      logger.debug({ userId, count: seriesTmdbIds.length }, 'Loading user ratings for TV shows');
+
+      // seasonNumber 0 is the show-level rating; season ratings are stored with their number.
+      const ratings = await prisma.tvRating.findMany({
+        where: { userId, seasonNumber: 0, seriesTmdbId: { in: seriesTmdbIds } },
+        select: { seriesTmdbId: true, score: true },
+      });
+      return Object.fromEntries(ratings.map(rating => [rating.seriesTmdbId, rating.score]));
+    },
+
     async getUserTvData(seriesTmdbId: string, userId: number) {
       const logger = localLogger('getUserTvData');
       logger.debug({ seriesTmdbId, userId }, 'Loading user TV show data');

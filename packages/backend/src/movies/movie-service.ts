@@ -5,6 +5,7 @@ import { LOGGER } from '../registry.js';
 import { tmdbClient } from './tmdb-client.js';
 import { omdbClient } from './omdb-client.js';
 import type {
+  MovieListResponse,
   TmdbSearchResponse,
   TmdbMovieListResult,
   TmdbMovieDetail,
@@ -53,7 +54,7 @@ export function createMovieService(options?: ServiceOptions) {
     }
   }
 
-  async function searchMovies(query: string, page = 1): Promise<TmdbSearchResponse> {
+  async function searchMovies(query: string, page = 1): Promise<MovieListResponse> {
     const logger = localLogger('searchMovies');
 
     try {
@@ -64,7 +65,7 @@ export function createMovieService(options?: ServiceOptions) {
         .json<TmdbSearchResponse>();
       return {
         ...response,
-        results: response.results.map(mapListItem) as unknown as TmdbMovieListResult[],
+        results: response.results.map(mapListItem),
       };
     } catch (error) {
       logger.error({ query, page, err: error }, 'TMDB search failed');
@@ -81,7 +82,7 @@ export function createMovieService(options?: ServiceOptions) {
   async function discoverMovies(
     sortBy: SortBy = 'popularity',
     page = 1
-  ): Promise<TmdbSearchResponse> {
+  ): Promise<MovieListResponse> {
     const logger = localLogger('discoverMovies');
     const tmdbSortBy = sortBy === 'rating' ? 'vote_average.desc' : 'popularity.desc';
 
@@ -98,7 +99,7 @@ export function createMovieService(options?: ServiceOptions) {
         .json<TmdbSearchResponse>();
       return {
         ...response,
-        results: response.results.map(mapListItem) as unknown as TmdbMovieListResult[],
+        results: response.results.map(mapListItem),
       };
     } catch (error) {
       logger.error({ sortBy, page, err: error }, 'TMDB discover failed');
@@ -112,12 +113,12 @@ export function createMovieService(options?: ServiceOptions) {
     }
   }
 
-  async function getMovieById(tmdbId: number): Promise<TmdbMovieListResult> {
+  async function getMovieById(tmdbId: number): Promise<MovieListItem> {
     const logger = localLogger('getMovieById');
 
     try {
       const movie = await tmdbClient.get(`movie/${tmdbId}`).json<TmdbMovieListResult>();
-      return mapListItem(movie) as unknown as TmdbMovieListResult;
+      return mapListItem(movie);
     } catch (error) {
       logger.error({ tmdbId, err: error }, 'TMDB request failed');
       if (error instanceof HTTPError) {
