@@ -1,6 +1,8 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { authenticate, getOptionalUserId } from '../auth/auth-middleware.js';
+import type { FastifyBaseLogger } from 'fastify';
+import { HttpError } from '../lib/http-error.js';
 import { createMovieService } from './movie-service.js';
 import { createUserDataService } from './user-data-service.js';
 import { createWatchService } from '../watch/watch-service.js';
@@ -78,10 +80,50 @@ async function withMyRatings(
   return { ...list, results };
 }
 
+interface LoadMovieListOptions {
+  query: z.infer<typeof listQuerySchema>;
+  userId: number | null;
+  logger: FastifyBaseLogger;
+}
+
+async function loadMovieList({
+  query,
+  userId,
+  logger,
+}: LoadMovieListOptions): Promise<MovieListResponse> {
+  const { tmdb_id, search, page, sort_by, user_filter } = query;
+  const movieService = createMovieService({ logger });
+
+  if (tmdb_id !== undefined) {
+    const movie = await movieService.getMovieById(tmdb_id);
+    return { results: [movie], page: 1, total_pages: 1, total_results: 1 };
+  }
+
+  if (search) {
+    return movieService.searchMovies(search, page);
+  }
+
+  if (user_filter && user_filter.length > 0) {
+    if (userId === null) throw new HttpError('Unauthorized', { statusCode: 401 });
+
+    const userDataService = createUserDataService({ logger });
+    const tmdbIds = await userDataService.getFilteredTmdbIds(userId, user_filter, sort_by);
+    const pageIds = tmdbIds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const results = await Promise.all(pageIds.map(id => movieService.getMovieById(id)));
+    return {
+      results,
+      page: tmdbIds.length === 0 ? 1 : page,
+      total_pages: Math.max(1, Math.ceil(tmdbIds.length / PAGE_SIZE)),
+      total_results: tmdbIds.length,
+    };
+  }
+
+  return movieService.discoverMovies(sort_by, page);
+}
+
 export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) => {
   fastify.get('/', { schema: { querystring: listQuerySchema } }, async (request, reply) => {
-    const { tmdb_id, search, page, sort_by, user_filter } = request.query;
-    const userDataService = createUserDataService({ logger: request.log });
+    const { sort_by, user_filter } = request.query;
 
     const requiredFilter = SORT_REQUIRED_FILTER[sort_by];
     if (requiredFilter !== undefined && !user_filter?.includes(requiredFilter)) {
@@ -90,51 +132,10 @@ export const movieRoutes: FastifyPluginCallbackZod = (fastify, _options, done) =
         .send({ error: `sort_by=${sort_by} requires user_filter to include "${requiredFilter}"` });
     }
 
-    if (tmdb_id !== undefined) {
-      const movieService = createMovieService({ logger: request.log });
-      const movie = await movieService.getMovieById(tmdb_id);
-      const userId = await getOptionalUserId(request);
-      const single = { results: [movie], page: 1, total_pages: 1, total_results: 1 };
-      return reply.send(await withMyRatings(single, userId, userDataService));
-    }
-
-    if (search) {
-      const movieService = createMovieService({ logger: request.log });
-      const data = await movieService.searchMovies(search, page);
-      const userId = await getOptionalUserId(request);
-      return reply.send(await withMyRatings(data, userId, userDataService));
-    }
-
-    if (user_filter && user_filter.length > 0) {
-      try {
-        await request.jwtVerify();
-      } catch {
-        return reply.code(401).send({ error: 'Unauthorized' });
-      }
-
-      const tmdbIds = await userDataService.getFilteredTmdbIds(
-        request.user.userId,
-        user_filter,
-        sort_by
-      );
-
-      if (tmdbIds.length === 0) {
-        return reply.send({ results: [], page: 1, total_pages: 1, total_results: 0 });
-      }
-
-      const totalResults = tmdbIds.length;
-      const totalPages = Math.ceil(totalResults / PAGE_SIZE);
-      const pageIds = tmdbIds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-      const movieService = createMovieService({ logger: request.log });
-      const results = await Promise.all(pageIds.map(id => movieService.getMovieById(id)));
-      const list = { results, page, total_pages: totalPages, total_results: totalResults };
-      return reply.send(await withMyRatings(list, request.user.userId, userDataService));
-    }
-
-    const movieService = createMovieService({ logger: request.log });
-    const data = await movieService.discoverMovies(sort_by, page);
     const userId = await getOptionalUserId(request);
-    return reply.send(await withMyRatings(data, userId, userDataService));
+    const list = await loadMovieList({ query: request.query, userId, logger: request.log });
+    const userDataService = createUserDataService({ logger: request.log });
+    return reply.send(await withMyRatings(list, userId, userDataService));
   });
 
   fastify.get('/export/letterboxd', { preHandler: authenticate }, async (request, reply) => {
