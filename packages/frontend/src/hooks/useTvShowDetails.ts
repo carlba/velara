@@ -1,16 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchTvShowDetail } from '@/services/tv-shows-api';
 import { fetchUserTvData } from '@/services/user-tv-data-api';
 import { useAuth } from './useAuth';
+import { useTvShow } from './useTvShow';
 
 export function useTvShowDetails(seriesId: string) {
   const { user } = useAuth();
 
-  const showQuery = useQuery({
-    queryKey: ['tv-show', seriesId],
-    queryFn: () => fetchTvShowDetail(seriesId),
-    staleTime: 10 * 60 * 1000,
-  });
+  const showQuery = useTvShow(seriesId);
 
   const userDataQuery = useQuery({
     queryKey: ['user-tv-data', seriesId],
